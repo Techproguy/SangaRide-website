@@ -1,7 +1,8 @@
 "use client";
 
 import { Check, ChevronDown } from "lucide-react";
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export type SelectOption = { value: string; label: string; disabled?: boolean };
 
@@ -45,13 +46,58 @@ export function Select({
 
   useEffect(() => {
     if (!open) return;
-    list.current?.focus();
-    const close = (e: MouseEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    list.current?.focus({ preventScroll: true });
+    const close = (e: globalThis.PointerEvent) => {
+      const target = e.target as Node;
+      if (!root.current?.contains(target) && !list.current?.contains(target)) setOpen(false);
     };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
   }, [open]);
+
+  // Render outside cards/sections so overflow and backdrop-filter cannot clip
+  // the menu. Keep it anchored while the page or mobile viewport moves.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const trigger = button.current;
+    const popup = list.current;
+    if (!trigger || !popup) return;
+
+    const position = () => {
+      const rect = trigger.getBoundingClientRect();
+      const viewport = window.visualViewport;
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const viewportLeft = viewport?.offsetLeft ?? 0;
+      const viewportWidth = viewport?.width ?? document.documentElement.clientWidth;
+      const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+      const gap = 8;
+      const below = Math.max(0, viewportBottom - rect.bottom - gap * 2);
+      const above = Math.max(0, rect.top - viewportTop - gap * 2);
+      const width = Math.min(rect.width, viewportWidth - gap * 2);
+      popup.style.width = `${width}px`;
+      const desiredHeight = Math.min(popup.scrollHeight + 2, 256);
+      const opensAbove = below < Math.min(desiredHeight, 132) && above > below;
+      popup.style.maxHeight = `${Math.min(256, opensAbove ? above : below)}px`;
+      popup.style.left = `${Math.max(viewportLeft + gap, Math.min(rect.left, viewportLeft + viewportWidth - width - gap))}px`;
+      popup.style.top = `${opensAbove ? rect.top - gap - popup.getBoundingClientRect().height : rect.bottom + gap}px`;
+      popup.style.visibility = "visible";
+    };
+
+    position();
+    window.addEventListener("scroll", position, { capture: true, passive: true });
+    window.addEventListener("resize", position);
+    window.visualViewport?.addEventListener("resize", position);
+    window.visualViewport?.addEventListener("scroll", position);
+    const observer = new ResizeObserver(position);
+    observer.observe(trigger);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", position, true);
+      window.removeEventListener("resize", position);
+      window.visualViewport?.removeEventListener("resize", position);
+      window.visualViewport?.removeEventListener("scroll", position);
+    };
+  }, [open, options.length]);
 
   useEffect(() => {
     if (open) list.current?.children[active]?.scrollIntoView({ block: "nearest" });
@@ -64,7 +110,7 @@ export function Select({
 
   function hide(refocus = true) {
     setOpen(false);
-    if (refocus) button.current?.focus();
+    if (refocus) button.current?.focus({ preventScroll: true });
   }
 
   function choose(i: number) {
@@ -104,7 +150,7 @@ export function Select({
       e.preventDefault();
       hide();
     } else if (e.key === "Tab") {
-      hide(false);
+      hide();
     } else if (e.key.length === 1) {
       const now = e.timeStamp;
       typed.current = { text: (now - typed.current.at < 600 ? typed.current.text : "") + e.key.toLowerCase(), at: now };
@@ -114,7 +160,7 @@ export function Select({
   }
 
   return (
-    <div ref={root} className="relative">
+    <div ref={root} className="relative min-w-0">
       <button
         ref={button}
         id={buttonId}
@@ -131,7 +177,7 @@ export function Select({
         {chevron && <ChevronDown className={`h-4 w-4 shrink-0 transition ${open ? "rotate-180" : ""}`} aria-hidden="true" />}
       </button>
 
-      {open && (
+      {open && createPortal(
         <ul
           ref={list}
           id={listId}
@@ -140,8 +186,8 @@ export function Select({
           aria-labelledby={buttonId}
           aria-activedescendant={`${listId}-${active}`}
           onKeyDown={onListKey}
-          className="absolute top-full left-0 z-50 mt-2 max-h-64 w-max min-w-full overflow-y-auto rounded-2xl border border-slate-100 bg-white p-1.5 shadow-panel focus:outline-none"
-          style={{ animation: "dropdown 140ms ease-out" }}
+          className="fixed z-[60] overflow-y-auto overscroll-contain rounded-2xl border border-slate-100 bg-white p-1.5 shadow-panel focus:outline-none"
+          style={{ visibility: "hidden", animation: "dropdown 140ms ease-out" }}
         >
           {options.map((o, i) => {
             const isSelected = i === selectedIndex;
@@ -154,7 +200,7 @@ export function Select({
                 aria-disabled={o.disabled || undefined}
                 onMouseEnter={() => !o.disabled && setActive(i)}
                 onClick={() => choose(i)}
-                className={`flex cursor-pointer items-center justify-between gap-6 rounded-xl px-3 py-2.5 text-[0.88rem] transition-colors ${
+                className={`flex min-h-11 cursor-pointer items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-[0.88rem] transition-colors ${
                   o.disabled
                     ? "cursor-not-allowed text-slate-400"
                     : i === active
@@ -167,7 +213,7 @@ export function Select({
               </li>
             );
           })}
-        </ul>
+        </ul>, document.body
       )}
     </div>
   );

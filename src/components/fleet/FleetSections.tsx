@@ -111,7 +111,7 @@ export function FleetCTA() {
               <MarketToggle label="Your market" tone="dark" />
             </div>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="action-pair flex flex-wrap gap-3">
             <MarketLink
               href={fleetApplyPath}
               className="inline-flex h-12 items-center gap-2 rounded-xl bg-brand-600 px-6 text-sm font-semibold transition hover:bg-brand-700"

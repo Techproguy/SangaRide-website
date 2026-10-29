@@ -11,7 +11,7 @@ export default function HelpPage() {
   return (
     <main>
       <HelpHero />
-      <div className="flex flex-col gap-20 py-16 sm:gap-24 lg:gap-28 lg:py-20">
+      <div className="flex flex-col gap-12 py-10 sm:gap-24 sm:py-16 lg:gap-28 lg:py-20">
         <SupportAreas />
         <PopularTopics />
         <GuidedHelpAndRequests />

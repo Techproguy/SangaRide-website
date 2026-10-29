@@ -24,22 +24,21 @@ export function FleetHero() {
   ];
 
   return (
-    <section aria-labelledby="fleet-hero-title" className="relative overflow-hidden bg-white lg:bg-navy-950">
-      <div className="absolute inset-x-0 top-0 h-[520px] sm:h-[540px] lg:h-full">
-        <Image
-          src="/images/fleet-hero.webp"
-          alt="A fleet manager checking a tablet beside rows of parked cars"
-          fill
-          preload
-          sizes="100vw"
-          className="object-cover object-[45%_center] lg:object-center"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-navy-950/95 via-navy-950/65 to-navy-950/25" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-navy-950/80 to-transparent" />
-      </div>
-
-      <div className="container-page relative grid grid-cols-1 items-center gap-x-12 gap-y-10 pt-12 pb-10 lg:min-h-[620px] lg:grid-cols-[1fr_360px] lg:py-14">
-        <div className="min-h-[440px] max-w-xl text-white sm:min-h-[460px] lg:min-h-0">
+    <section aria-labelledby="fleet-hero-title" className="relative isolate overflow-hidden bg-white lg:bg-navy-950">
+      <div className="container-page relative lg:static grid grid-cols-1 items-center gap-x-12 gap-y-10 pt-0 pb-10 lg:min-h-[620px] lg:grid-cols-[1fr_360px] lg:py-14">
+        <div className="relative isolate -mx-4 px-4 pt-10 pb-8 text-white sm:-mx-6 sm:px-6 sm:py-12 lg:static lg:isolation-auto lg:mx-0 lg:max-w-xl lg:p-0">
+          <div className="absolute inset-0 -z-10">
+            <Image
+              src="/images/fleet-hero.webp"
+              alt="A fleet manager checking a tablet beside rows of parked cars"
+              fill
+              preload
+              sizes="100vw"
+              className="object-cover object-[45%_center] lg:object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-navy-950/95 via-navy-950/65 to-navy-950/25" />
+            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-navy-950/80 to-transparent" />
+          </div>
           <p className="eyebrow text-white/80">Sanga Fleet</p>
           <h1 id="fleet-hero-title" className="heading-xl mt-4">
             Your vehicles.
@@ -64,7 +63,7 @@ export function FleetHero() {
             ))}
           </ul>
 
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="action-pair mt-8 flex flex-wrap gap-3">
             <MarketLink
               href={fleetApplyPath}
               className="inline-flex h-12 items-center gap-2 rounded-xl bg-brand-600 px-6 text-sm font-semibold text-white transition hover:bg-brand-700"

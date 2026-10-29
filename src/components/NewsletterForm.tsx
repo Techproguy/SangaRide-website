@@ -25,7 +25,7 @@ export function NewsletterForm() {
         Get the latest from Sanga
       </label>
       <p className="mt-1 text-[0.8rem] text-white/60">Product updates, city expansions and more.</p>
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-col gap-2 min-[400px]:flex-row">
         <input
           id={id}
           type="email"
@@ -34,11 +34,11 @@ export function NewsletterForm() {
           placeholder="Enter your email"
           autoComplete="email"
           aria-invalid={message?.tone === "error"}
-          className="h-11 min-w-0 flex-1 rounded-full border border-white/15 bg-white/5 px-4 text-sm text-white placeholder:text-white/40 focus:border-brand-400 focus:outline-none"
+          className="h-11 min-w-0 flex-none rounded-full border border-white/15 bg-white/5 px-4 text-sm text-white placeholder:text-white/40 focus:border-brand-400 focus:outline-none min-[400px]:flex-1"
         />
         <button
           type="submit"
-          className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-brand-600 px-5 text-sm font-semibold text-white transition hover:bg-brand-500"
+          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-brand-600 px-5 text-sm font-semibold text-white transition hover:bg-brand-500"
         >
           Subscribe <ArrowRight className="h-4 w-4" />
         </button>

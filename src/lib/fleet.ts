@@ -3,8 +3,8 @@
 
 import type { CountryCode } from "./content";
 
-/** Fleet partner application and partnerships enquiry; both show honest states until connected. */
-export const fleetApplyPath = "/fleet/apply";
+/** Fleet portal entry and partnerships enquiry; live services remain unconnected. */
+export const fleetApplyPath = "/fleet/portal/login";
 export const fleetContactPath = "/fleet/contact";
 
 export type SettlementExample = {

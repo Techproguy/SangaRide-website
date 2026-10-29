@@ -18,7 +18,7 @@ export default function DrivePage() {
     <main>
       <MarketProvider>
         <DriveHero />
-        <div className="flex flex-col gap-24 py-20 sm:gap-28 lg:gap-32 lg:py-28">
+        <div className="flex flex-col gap-14 py-12 sm:gap-28 sm:py-20 lg:gap-32 lg:py-28">
           <RequestToPayout />
           <DriveOnYourTerms />
           <DriveProtection />

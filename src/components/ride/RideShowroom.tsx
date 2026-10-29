@@ -167,7 +167,7 @@ function RideSelector({
       aria-label="Choose a ride type"
       className={
         compact
-          ? `scrollbar-none -mx-4 flex snap-x gap-2 overflow-x-auto px-4 sm:-mx-6 sm:px-6 ${className}`
+          ? `grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3 ${className}`
           : `grid-cols-6 gap-2 rounded-[2rem] border border-slate-100 bg-white p-2 shadow-card ${className}`
       }
     >
@@ -180,16 +180,19 @@ function RideSelector({
             role="radio"
             aria-checked={active}
             onClick={() => onSelect?.(r.id)}
-            className={`group shrink-0 snap-start rounded-[1.5rem] border-2 text-left transition ${
-              compact ? "w-[6.5rem] bg-white p-2 text-center" : "p-3"
-            } ${active ? "border-brand-600 bg-brand-50/50" : "border-transparent hover:bg-surface"}`}
+            className={`group relative min-w-0 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
+              compact
+                ? `rounded-2xl border px-2 pt-2.5 pb-3 text-center ${active ? "border-brand-200 bg-white shadow-[0_5px_16px_-8px_rgba(29,95,255,0.35)]" : "border-white/80 bg-white/60 hover:border-brand-200 hover:bg-white"}`
+                : `rounded-[1.5rem] border-2 p-3 text-left ${active ? "border-brand-600 bg-brand-50/50" : "border-transparent hover:bg-surface"}`
+            }`}
           >
-            <span className={`relative block ${compact ? "mx-auto h-10 w-20" : "h-16 w-full"}`}>
+            <span className={`relative block ${compact ? "mx-auto h-9 w-full max-w-20" : "h-16 w-full"}`}>
               <Image src={r.image} alt="" fill sizes="160px" className="object-contain mix-blend-multiply" />
             </span>
-            <span className={`mt-2 block font-bold ${compact ? "text-[0.75rem]" : "text-[0.9rem]"} ${active ? "text-brand-700" : ""}`}>
+            <span className={`block font-bold ${compact ? "mt-1 text-xs" : "mt-2 text-[0.9rem]"} ${active ? "text-brand-700" : ""}`}>
               {compact ? r.name.replace("Sanga ", "") : r.name}
             </span>
+            {compact && active && <span aria-hidden="true" className="absolute inset-x-[35%] bottom-0 h-0.5 rounded-t-full bg-brand-600" />}
             {!compact && <span className="block text-[0.75rem] text-muted">{r.tagline}</span>}
           </button>
         );

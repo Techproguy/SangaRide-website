@@ -50,7 +50,7 @@ export function DriveFAQ() {
               <p className="max-w-md text-[0.95rem] text-white/80">
                 Start your application and we&apos;ll show you what&apos;s needed where you are.
               </p>
-              <div className="flex flex-wrap gap-3">
+              <div className="action-pair flex flex-wrap gap-3">
                 <ApplyLink className="inline-flex h-12 items-center gap-2 rounded-xl bg-brand-600 px-6 text-sm font-semibold text-white transition hover:bg-brand-700">
                   Start application <ArrowRight className="h-4 w-4" />
                 </ApplyLink>

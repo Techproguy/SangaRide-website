@@ -227,7 +227,7 @@ export function GuidedHelpAndRequests() {
           <p className="mt-2 text-[0.92rem] leading-relaxed text-muted">
             Sign in to see updates, respond to requests and check the outcome. Request details are only shown to you.
           </p>
-          <div className="mt-auto flex flex-wrap gap-3 pt-8">
+          <div className="action-pair mt-auto flex flex-wrap gap-3 pt-8">
             <Link
               href={`/sign-in?next=${encodeURIComponent(helpRequestsPath)}`}
               className="inline-flex h-11 items-center gap-2 rounded-full bg-ink px-6 text-sm font-semibold text-white transition hover:bg-black"

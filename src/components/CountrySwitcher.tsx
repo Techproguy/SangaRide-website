@@ -7,7 +7,7 @@ import { FlagNigeria, FlagUnitedStates } from "./icons";
 
 const flags = { NG: FlagNigeria, US: FlagUnitedStates };
 
-export function CountrySwitcher({ align = "right", up = false }: { align?: "left" | "right"; up?: boolean }) {
+export function CountrySwitcher({ align = "right", up = false, compact = false }: { align?: "left" | "right"; up?: boolean; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [country, setCountry] = useState<CountryCode>("NG");
   const ref = useRef<HTMLDivElement>(null);
@@ -29,18 +29,20 @@ export function CountrySwitcher({ align = "right", up = false }: { align?: "left
   }, [open]);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className={`relative ${compact ? "w-full min-w-0" : ""}`}>
       <button
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Country: ${countries[country].name}`}
         onClick={() => setOpen((o) => !o)}
-        className="flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-[0.8rem] font-semibold text-ink transition hover:border-slate-300"
+        className={`flex min-h-11 items-center rounded-full border border-slate-200 bg-white font-semibold text-ink transition hover:border-slate-300 lg:min-h-9 ${compact ? "w-full gap-1.5 px-2.5 text-xs" : "gap-2 px-3 text-[0.8rem]"}`}
       >
-        <Flag className="h-4 w-4" />
-        {countries[country].name} ({countries[country].currency})
-        <ChevronDown className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} />
+        <Flag className="h-4 w-4 shrink-0" />
+        <span className={compact ? "min-w-0 flex-1 truncate text-left" : ""}>
+          {compact ? country === "US" ? "USA" : countries[country].name : `${countries[country].name} (${countries[country].currency})`}
+        </span>
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <ul
@@ -60,7 +62,7 @@ export function CountrySwitcher({ align = "right", up = false }: { align?: "left
                     setCountry(code);
                     setOpen(false);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-brand-50"
+                  className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-brand-50"
                 >
                   <ItemFlag className="h-4 w-4" />
                   <span className="flex-1">

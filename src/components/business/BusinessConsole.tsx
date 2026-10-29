@@ -134,7 +134,7 @@ function OverviewPanel({ demo, money }: ModuleProps) {
         {tiles.map(([k, v]) => (
           <div key={k} className="rounded-xl border border-slate-100 p-3">
             <dt className="text-[0.7rem] text-muted">{k}</dt>
-            <dd className="mt-1 text-lg font-extrabold tracking-tight">{v}</dd>
+            <dd className="mt-1 break-words text-base font-extrabold tracking-tight sm:text-lg">{v}</dd>
           </div>
         ))}
       </dl>

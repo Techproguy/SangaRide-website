@@ -29,7 +29,7 @@ export function AboutHero() {
             A mobility platform being built for people, communities and businesses — making transportation more
             understandable, accountable and responsive to the places we serve.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="action-pair mt-8 flex flex-wrap gap-3">
             <Link
               href="#why-we-exist"
               className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-7 text-sm font-semibold text-ink transition hover:bg-brand-50"

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Caveat, Plus_Jakarta_Sans } from "next/font/google";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { MarketingChrome } from "@/components/MarketingChrome";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -26,9 +27,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${jakarta.variable} ${caveat.variable}`}>
       <body>
-        <SiteHeader />
+        <MarketingChrome><SiteHeader /></MarketingChrome>
         {children}
-        <SiteFooter />
+        <MarketingChrome><SiteFooter /></MarketingChrome>
       </body>
     </html>
   );

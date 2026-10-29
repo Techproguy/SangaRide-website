@@ -189,7 +189,7 @@ export function BusinessCTA() {
               Talk to our team about how your organisation moves, and what&apos;s available in your market.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="action-pair flex flex-wrap gap-3">
             <MarketLink
               href={businessContactPath}
               className="inline-flex h-12 items-center gap-2 rounded-xl bg-brand-600 px-6 text-sm font-semibold transition hover:bg-brand-700"

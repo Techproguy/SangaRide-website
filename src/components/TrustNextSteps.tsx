@@ -74,27 +74,27 @@ export function TrustNextSteps() {
               <p className="mt-4 max-w-md text-[0.95rem] leading-relaxed text-muted">
                 Download the Sanga Ride app for a seamless experience — anytime, anywhere.
               </p>
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <a href="#" aria-label="Download on the App Store" className="flex h-11 items-center gap-2 rounded-xl bg-ink px-3.5 text-white transition hover:bg-black">
-                  <AppleIcon className="h-6 w-6" />
+              <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+                <a href="#" aria-label="Download on the App Store" className="flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-ink px-2 text-white transition hover:bg-black sm:gap-2 sm:px-3.5">
+                  <AppleIcon className="h-4 w-4 shrink-0 sm:h-6 sm:w-6" />
                   <span className="leading-none">
                     <span className="block text-[0.55rem]">Download on the</span>
-                    <span className="block text-[0.95rem] font-semibold">App Store</span>
+                    <span className="block text-xs font-semibold sm:text-[0.95rem]">App Store</span>
                   </span>
                 </a>
-                <a href="#" aria-label="Get it on Google Play" className="flex h-11 items-center gap-2 rounded-xl bg-ink px-3.5 text-white transition hover:bg-black">
-                  <GooglePlayIcon className="h-5 w-5" />
+                <a href="#" aria-label="Get it on Google Play" className="flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-ink px-2 text-white transition hover:bg-black sm:gap-2 sm:px-3.5">
+                  <GooglePlayIcon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
                   <span className="leading-none">
                     <span className="block text-[0.55rem] uppercase">Get it on</span>
-                    <span className="block text-[0.95rem] font-semibold">Google Play</span>
+                    <span className="block text-xs font-semibold sm:text-[0.95rem]">Google Play</span>
                   </span>
                 </a>
               </div>
             </div>
 
-            <div className="relative mt-auto flex items-end justify-between gap-6 px-7 sm:px-10">
+            <div className="relative mt-auto flex items-end justify-between gap-6 px-7 pb-3 sm:px-10">
               <PhoneMockups />
-              <div className="hidden items-center gap-3 pb-10 sm:flex sm:flex-col sm:text-center">
+              <div className="hidden shrink-0 items-center gap-3 pb-10 sm:flex sm:flex-col sm:text-center">
                 <span className="rounded-2xl bg-white p-2.5 shadow-card">
                   <QrGraphic className="h-20 w-20 text-ink" />
                 </span>
@@ -113,7 +113,7 @@ export function TrustNextSteps() {
               <h2 className="heading-lg">Let&apos;s move together.</h2>
               <p className="mt-3 text-[0.95rem] text-white/80">For everyday journeys, for people and businesses, for the cities ahead.</p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="action-pair flex flex-wrap gap-3">
               <Link
                 href="/book"
                 className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-7 text-sm font-semibold text-ink transition hover:bg-brand-50"
@@ -137,8 +137,8 @@ export function TrustNextSteps() {
 /** Illustrative app screens built in HTML; replace with approved Rider app screenshots. */
 function PhoneMockups() {
   return (
-    <div className="relative h-[250px] w-[270px] shrink-0 overflow-hidden" aria-hidden="true">
-      <div className="absolute top-10 left-0 h-[300px] w-[140px] -rotate-6 rounded-[1.8rem] border-[5px] border-navy-950 bg-[#eef3fb] shadow-panel">
+    <div className="relative mx-auto h-[370px] w-full min-w-0 max-w-[310px]" aria-hidden="true">
+      <div className="absolute top-12 left-[6%] h-[300px] w-[48%] max-w-[140px] -rotate-4 rounded-[1.8rem] border-[5px] border-navy-950 bg-[#eef3fb] shadow-panel">
         <div className="mx-auto mt-1.5 h-3 w-12 rounded-full bg-navy-950" />
         <svg viewBox="0 0 140 270" className="absolute inset-0 h-full w-full rounded-[1.5rem]">
           <g stroke="#d4deee" strokeWidth="6" fill="none">
@@ -153,7 +153,7 @@ function PhoneMockups() {
         </svg>
       </div>
 
-      <div className="absolute top-2 right-0 h-[310px] w-[150px] rotate-3 rounded-[1.9rem] border-[5px] border-navy-950 bg-white shadow-panel">
+      <div className="absolute top-4 right-[6%] h-[310px] w-[52%] max-w-[150px] rotate-2 rounded-[1.9rem] border-[5px] border-navy-950 bg-white shadow-panel">
         <div className="mx-auto mt-1.5 h-3 w-12 rounded-full bg-navy-950" />
         <div className="px-3 pt-2">
           <p className="text-[0.6rem] font-bold">Good evening, Mercy</p>

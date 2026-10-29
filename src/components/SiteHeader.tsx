@@ -4,6 +4,7 @@ import { ArrowRight, ChevronDown, Menu, Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { primaryNav, rideMenu } from "@/lib/content";
 import { businessContactPath } from "@/lib/business";
 import { driverApplyPath } from "@/lib/drive";
@@ -15,6 +16,8 @@ export function SiteHeader() {
   const [rideOpen, setRideOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const rideRef = useRef<HTMLLIElement>(null);
+  const mobileRef = useRef<HTMLDivElement>(null);
+  const mobileTrigger = useRef<HTMLButtonElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // Short delay so the menu survives brief pointer exits between link and panel.
   const openRide = () => {
@@ -54,7 +57,36 @@ export function SiteHeader() {
   useEffect(() => () => clearTimeout(closeTimer.current), []);
 
   useEffect(() => {
-    document.body.style.overflow = mobileOpen ? "hidden" : "";
+    if (!mobileOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const trigger = mobileTrigger.current;
+    document.body.style.overflow = "hidden";
+    const dialog = mobileRef.current;
+    const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex="0"]') ?? []).filter((el) => el.getClientRects().length > 0);
+    focusable()[0]?.focus();
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileOpen(false);
+      if (event.key !== "Tab") return;
+      const elements = focusable();
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first?.focus();
+      }
+    };
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const closeOnDesktop = () => { if (desktop.matches) setMobileOpen(false); };
+    closeOnDesktop();
+    desktop.addEventListener("change", closeOnDesktop);
+    document.addEventListener("keydown", keydown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", keydown);
+      desktop.removeEventListener("change", closeOnDesktop);
+      trigger?.focus();
+    };
   }, [mobileOpen]);
 
   return (
@@ -143,66 +175,57 @@ export function SiteHeader() {
         </div>
 
         <button
+          ref={mobileTrigger}
           type="button"
           aria-label="Open menu"
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen(true)}
-          className="ml-auto lg:hidden"
+          className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg lg:hidden"
         >
           <Menu className="h-6 w-6" />
         </button>
       </div>
 
-      {mobileOpen && (
-        <div role="dialog" aria-modal="true" aria-label="Menu" className="fixed inset-0 z-50 flex flex-col bg-white lg:hidden">
-          <div className="container-page flex h-16 items-center justify-between border-b border-slate-100">
+      {mobileOpen && createPortal(
+        <div ref={mobileRef} role="dialog" aria-modal="true" aria-label="Menu" className="fixed inset-0 z-50 flex h-dvh flex-col bg-white lg:hidden">
+          <div className="container-page flex h-16 shrink-0 items-center justify-between border-b border-slate-100">
             <Logo />
-            <button type="button" aria-label="Close menu" onClick={() => setMobileOpen(false)}>
+            <button type="button" aria-label="Close menu" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-lg">
               <X className="h-6 w-6" />
             </button>
           </div>
-          <nav aria-label="Mobile" className="container-page flex-1 overflow-y-auto py-6">
-            <p className="eyebrow mb-2 text-muted">Ride types & journeys</p>
-            <ul className="mb-6 grid grid-cols-2 gap-1">
-              {[...rideMenu.services, ...rideMenu.journeys].map((s) => (
-                <li key={s.href}>
-                  <Link href={s.href} onClick={() => setMobileOpen(false)} className="block rounded-lg py-2 text-[0.95rem] font-semibold">
-                    {s.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <ul className="space-y-1 border-t border-slate-100 pt-4">
+          <nav aria-label="Mobile" className="container-page min-h-0 flex-1 overscroll-contain overflow-y-auto py-5">
+            <ul className="grid grid-cols-2 gap-x-6 gap-y-2">
               {[{ label: "Ride", href: "/ride" }, ...primaryNav].map((item) => (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
                     aria-current={isActive(item.href) ? "page" : undefined}
-                    className={`block py-2.5 text-lg font-bold ${isActive(item.href) ? "text-brand-600" : ""}`}
+                    className={`flex min-h-14 items-center rounded-lg py-3 text-lg font-semibold transition hover:text-brand-600 ${isActive(item.href) ? "text-brand-600" : ""}`}
                   >
                     {item.label}
                   </Link>
                 </li>
               ))}
+              <li className="flex min-w-0 items-center">
+                <CountrySwitcher align="right" up compact />
+              </li>
             </ul>
-            <div className="mt-6">
-              <CountrySwitcher align="left" />
-            </div>
           </nav>
-          <div className="container-page grid grid-cols-2 gap-3 border-t border-slate-100 py-4">
-            <Link href="/sign-in" className="flex h-12 items-center justify-center rounded-xl border border-slate-200 font-semibold">
+          <div className="container-page grid shrink-0 grid-cols-[80px_minmax(0,1fr)] gap-3 border-t border-slate-100 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <Link href="/sign-in" onClick={() => setMobileOpen(false)} className="flex min-h-12 items-center justify-center rounded-xl border border-slate-200 text-sm font-semibold">
               Sign in
             </Link>
             <Link
               href={cta.href}
               onClick={() => setMobileOpen(false)}
-              className="flex h-12 items-center justify-center gap-2 rounded-xl bg-brand-600 font-semibold text-white"
+              className="flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-xl bg-brand-600 px-3 py-2 text-center text-xs font-semibold text-white sm:text-sm"
             >
-              {cta.label} <ArrowRight className="h-4 w-4" />
+              {cta.label} <ArrowRight className="h-4 w-4 shrink-0" />
             </Link>
           </div>
-        </div>
+        </div>, document.body
       )}
     </header>
   );

@@ -33,7 +33,7 @@ function RidePageBody({ selected, onSelect }: { selected: (typeof rides)[number]
   return (
     <>
       <RideShowroom rides={rides} selected={selected} onSelect={onSelect} />
-      <div className="flex flex-col gap-24 pt-16 pb-20 sm:gap-28 lg:gap-32 lg:pt-20 lg:pb-28">
+      <div className="flex flex-col gap-14 pt-10 pb-12 sm:gap-28 sm:pt-16 sm:pb-20 lg:gap-32 lg:pt-20 lg:pb-28">
         <RideComparison
           rides={rides}
           selected={selected}

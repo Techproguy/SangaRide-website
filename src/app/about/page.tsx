@@ -13,7 +13,7 @@ export default function AboutPage() {
     <main>
       <AboutHero />
       {/* Same section rhythm as the homepage. */}
-      <div className="flex flex-col gap-24 py-20 sm:gap-28 lg:gap-36 lg:py-28">
+      <div className="flex flex-col gap-14 py-12 sm:gap-28 sm:py-20 lg:gap-36 lg:py-28">
         <WhyWeExist />
         <Principles />
         <PeopleGallery />

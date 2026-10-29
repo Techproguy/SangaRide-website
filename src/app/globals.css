@@ -34,6 +34,17 @@
     @apply bg-white font-sans text-ink antialiased;
   }
 
+  @media (max-width: 1023px) {
+    button,
+    [role="option"] {
+      min-height: 44px;
+    }
+  }
+
+  main {
+    overflow-wrap: break-word;
+  }
+
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-brand-500;
   }
@@ -52,16 +63,56 @@
   }
 }
 
+/* Keep this outside the utility layers: small text utilities must not re-enable
+   Safari's automatic form-focus zoom on phones and tablets. */
+@media (max-width: 1023px) {
+  /* Share one row while allowing longer action labels to take more room. */
+  .action-pair {
+    width: 100%;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .action-pair > a,
+  .action-pair > button {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: auto;
+    min-height: 3rem;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.75rem 0.625rem;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    text-align: center;
+    text-wrap: balance;
+  }
+
+  .action-pair > a > svg,
+  .action-pair > button > svg {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex-shrink: 0;
+  }
+
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 1rem;
+  }
+}
+
 @utility container-page {
   @apply mx-auto w-full max-w-[1280px] px-4 sm:px-6 lg:px-8;
 }
 
 @utility heading-xl {
-  @apply text-[2.5rem] leading-[0.98] font-extrabold tracking-[-0.035em] sm:text-6xl lg:text-[3.75rem];
+  @apply text-[clamp(2rem,9.5vw,2.5rem)] leading-[0.98] font-extrabold tracking-[-0.035em] sm:text-6xl lg:text-[3.75rem];
 }
 
 @utility heading-lg {
-  @apply text-[2rem] leading-[1.02] font-extrabold tracking-[-0.03em] sm:text-[2.6rem] lg:text-[2.5rem] xl:text-[2.8rem];
+  @apply text-[clamp(1.65rem,7.5vw,2rem)] leading-[1.02] font-extrabold tracking-[-0.03em] sm:text-[2.6rem] lg:text-[2.5rem] xl:text-[2.8rem];
 }
 
 @utility eyebrow {

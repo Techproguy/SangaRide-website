@@ -205,7 +205,8 @@ function Settlements({ demo, market }: { demo: FleetDemo; market: CountryCode })
   const money = moneyFormatter(example.locale, example.currency).format;
   return (
     <>
-      <div className="overflow-x-auto rounded-xl border border-slate-100">
+      <p className="mb-2 text-xs text-muted sm:hidden">Swipe across to see all allocation columns.</p>
+      <div role="region" aria-label="Scrollable example trip allocations" tabIndex={0} className="overflow-x-auto overscroll-x-contain rounded-xl border border-slate-100">
         <table className="w-full min-w-[520px] text-left text-[0.8rem]">
           <caption className="sr-only">Example trip allocations, demo data</caption>
           <thead className="bg-surface text-[0.7rem] text-muted">

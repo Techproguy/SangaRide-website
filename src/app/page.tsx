@@ -10,7 +10,7 @@ export default function Home() {
     <main>
         <Hero />
         {/* One shared rhythm between sections so the page reads as a single story. */}
-        <div className="flex flex-col gap-24 py-20 sm:gap-28 lg:gap-36 lg:py-28">
+        <div className="flex flex-col gap-14 py-12 sm:gap-28 sm:py-20 lg:gap-36 lg:py-28">
           <SangaExperience />
           <RideDiscoveryShowcase />
           <JourneyStoryRail />

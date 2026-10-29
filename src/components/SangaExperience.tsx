@@ -38,18 +38,17 @@ export function SangaExperience() {
             className="-z-10 object-cover object-[30%_center]"
           />
           <div className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent via-navy-950/40 to-navy-950/95 md:bg-gradient-to-r md:from-transparent md:via-navy-950/45 md:to-navy-950/90" />
+          <div className="pointer-events-none absolute inset-0 -z-10 hidden bg-[radial-gradient(ellipse_at_bottom_left,rgba(5,12,28,0.85),transparent_70%)] xl:block" />
 
           <div className="grid min-h-[420px] gap-8 p-6 sm:p-8 md:grid-cols-[1fr_minmax(0,300px)] md:items-center">
             <p
               aria-hidden="true"
-              className="hidden -rotate-6 self-center justify-self-end font-script text-[2.4rem] leading-[1.05] font-medium text-white/90 xl:block"
+              className="hidden max-w-[280px] self-end pb-3 text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.25)] xl:block"
             >
-              Different
-              <br />
-              journeys.
-              <br />A more
-              <br />
-              connected you.
+              <span className="mb-5 block h-px w-10 bg-brand-200/80" />
+              <span className="mb-3 block text-[0.65rem] leading-relaxed font-semibold tracking-[0.2em] text-white/80 uppercase">Different journeys.</span>
+              <span className="block font-[Georgia,serif] text-[2rem] leading-[1.15] tracking-[-0.03em] italic">A more</span>
+              <span className="mt-1 block font-[Georgia,serif] text-[2.35rem] leading-[1.15] tracking-[-0.035em] text-brand-200 italic">connected you.</span>
             </p>
 
             <ul className="self-end space-y-5 md:col-start-2 md:self-center">

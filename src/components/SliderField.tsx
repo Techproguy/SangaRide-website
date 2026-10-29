@@ -24,7 +24,7 @@ export function SliderField({
 }) {
   return (
     <div>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <label htmlFor={`${id}-range`} className="text-[0.82rem] font-medium">
           {label}
         </label>
@@ -42,7 +42,7 @@ export function SliderField({
           value={Math.min(value, max)}
           aria-valuetext={display}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="min-w-0 flex-1 cursor-pointer accent-brand-600"
+          className="h-11 min-w-0 flex-1 cursor-pointer accent-brand-600"
         />
         <label htmlFor={`${id}-number`} className="sr-only">
           {label} ({unit})
@@ -58,7 +58,7 @@ export function SliderField({
             const n = e.target.valueAsNumber;
             onChange(Number.isFinite(n) ? Math.max(min, n) : min);
           }}
-          className="h-8 w-[5.5rem] rounded-lg border border-slate-200 px-2 text-right text-[0.8rem] font-semibold tabular-nums focus:border-brand-500 focus:outline-none"
+          className="h-11 w-[5.5rem] rounded-lg border border-slate-200 px-2 text-right text-[0.8rem] font-semibold tabular-nums focus:border-brand-500 focus:outline-none"
         />
       </div>
     </div>

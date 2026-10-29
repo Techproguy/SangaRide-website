@@ -35,7 +35,7 @@ export function MarketToggle({ label = "Market", tone = "light" }: { label?: str
             type="button"
             aria-pressed={active}
             onClick={() => setMarket(code)}
-            className={`rounded-full px-3.5 py-1.5 text-[0.78rem] font-semibold transition ${
+            className={`min-h-11 rounded-full px-3.5 py-1.5 text-[0.78rem] font-semibold transition ${
               active
                 ? "bg-brand-600 text-white"
                 : tone === "dark"
