@@ -1994,6 +1994,24 @@
   font-weight: 600;
   letter-spacing: -0.06em;
 }
+.fp-back-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: 20px;
+  color: #1550f0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.fp-back-home:hover {
+  text-decoration: underline;
+}
+.fp-back-home:focus-visible {
+  outline: 2px solid #1550f0;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
 .fp-login-content > .fp-muted {
   font-size: 19px;
 }

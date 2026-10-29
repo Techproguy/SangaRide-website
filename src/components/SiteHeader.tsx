@@ -28,7 +28,7 @@ export function SiteHeader() {
     closeTimer.current = setTimeout(() => setRideOpen(false), 150);
   };
   const pathname = usePathname();
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (href: string) => pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
   // Audience pages swap the rider CTA for their own conversion.
   const cta = isActive("/drive")
     ? { label: "Apply to drive", href: driverApplyPath }
@@ -97,7 +97,10 @@ export function SiteHeader() {
         </Link>
 
         <nav aria-label="Main" className="hidden lg:ml-2 lg:block xl:ml-6">
-          <ul className="flex items-center gap-5 text-[0.82rem] font-semibold text-ink xl:gap-7">
+          <ul className="flex items-center gap-4 text-[0.82rem] font-semibold text-ink xl:gap-5">
+            <li>
+              <Link href="/" aria-current={isActive("/") ? "page" : undefined} className={linkClass("/")}>Home</Link>
+            </li>
             <li ref={rideRef} className="relative" onMouseEnter={openRide} onMouseLeave={closeRide}>
               <span className="flex items-center gap-0.5">
                 <Link href="/ride" aria-current={isActive("/ride") ? "page" : undefined} className={linkClass("/ride")}>
@@ -189,13 +192,16 @@ export function SiteHeader() {
       {mobileOpen && createPortal(
         <div ref={mobileRef} role="dialog" aria-modal="true" aria-label="Menu" className="fixed inset-0 z-50 flex h-dvh flex-col bg-white lg:hidden">
           <div className="container-page flex h-16 shrink-0 items-center justify-between border-b border-slate-100">
-            <Logo />
+            <Link href="/" aria-label="Sanga Ride home" onClick={() => setMobileOpen(false)}><Logo /></Link>
             <button type="button" aria-label="Close menu" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-lg">
               <X className="h-6 w-6" />
             </button>
           </div>
           <nav aria-label="Mobile" className="container-page min-h-0 flex-1 overscroll-contain overflow-y-auto py-5">
             <ul className="grid grid-cols-2 gap-x-6 gap-y-2">
+              <li className="col-span-2 border-b border-slate-100 pb-2">
+                <Link href="/" onClick={() => setMobileOpen(false)} aria-current={isActive("/") ? "page" : undefined} className={`flex min-h-14 items-center rounded-lg py-3 text-lg font-semibold hover:text-brand-600 ${linkClass("/")}`}>Home</Link>
+              </li>
               {[{ label: "Ride", href: "/ride" }, ...primaryNav].map((item) => (
                 <li key={item.href}>
                   <Link

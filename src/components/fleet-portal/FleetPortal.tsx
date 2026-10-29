@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  ArrowLeft,
   Bell,
   CalendarDays,
   ChevronDown,
@@ -113,6 +114,9 @@ export function FleetPortal({ path }: { path: string }) {
           />
         </Link>
         <nav aria-label="Fleet portal navigation">
+          <Link href="/" className="fp-nav-item">
+            <ArrowLeft size={16} /><span>Back to home</span>
+          </Link>
           {navigation.map((item) => {
             const active =
               item.path === ""
@@ -167,7 +171,7 @@ export function FleetPortal({ path }: { path: string }) {
               <Link href={portalUrl("settings/profile")}>
                 Account & profile
               </Link>
-              <Link href="/fleet">Back to website</Link>
+              <Link href="/">Back to home</Link>
               <Link href={portalUrl("login")}>Sign out of preview</Link>
             </div>
           </details>
@@ -304,9 +308,9 @@ function Login() {
           height={1043}
         />
         <Link
-          href="/fleet"
+          href="/"
           className="fp-login-logo"
-          aria-label="Back to Sanga Fleet"
+          aria-label="Sanga Ride home"
         >
           <Asset
             screen="922:20482"
@@ -336,6 +340,7 @@ function Login() {
       </section>
       <section className="fp-login-content">
         <div>
+          <Link href="/" className="fp-back-home"><ArrowLeft size={16} /> Back to home</Link>
           <h2>
             Welcome to
             <br />
