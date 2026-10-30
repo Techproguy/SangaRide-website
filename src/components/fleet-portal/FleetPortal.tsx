@@ -19,8 +19,22 @@ import {
 } from "lucide-react";
 import { portalUrl } from "@/lib/fleet-portal";
 import { Asset, DemoContext, Button, Field } from "./ui";
-import { Dashboard, Operations, Earnings } from "./Overview";
-import { Directory, InviteDriver } from "./Directory";
+import {
+  Dashboard,
+  Earnings,
+  Operations,
+  OperationsUnavailable,
+} from "./Overview";
+import {
+  Directory,
+  DriverDirectory,
+  InviteDriver,
+  IssueDirectory,
+  TeamDirectory,
+  VehicleDirectory,
+  fixturePerson,
+} from "./Directory";
+import type { PreviewState } from "@/lib/fleet-preview-domain";
 import {
   VehicleDetail,
   DriverDetail,
@@ -29,7 +43,90 @@ import {
   TripDetail,
 } from "./Details";
 import { Finance, Reports } from "./Finance";
+import { WorkflowScreen, handlesWorkflow } from "./Workflows";
+import { PreviewToolbar } from "./WorkflowUI";
+import { usePreview } from "./PreviewProvider";
 import { Settings, SupportTicket } from "./Settings";
+
+const designedVehicleTabs = [
+  "overview",
+  "documents",
+  "maintenance",
+  "assignments",
+  "trips",
+  "earnings",
+];
+/**
+ * Figma-designed screens take precedence over the generic workflow views. Workflow-only
+ * steps (review, verification, manage, split) and records without design data fall through.
+ */
+function designedScreen(path: string, state: PreviewState): ReactNode {
+  if (["earnings", "payouts", "payouts/destination"].includes(path))
+    // Operations staff get the workflow layer's permission-denied view.
+    return state.role === "Operations" ? null : path === "earnings" ? (
+      <Earnings />
+    ) : (
+      <Finance key={path} path={path} />
+    );
+  if (path === "drivers") return <DriverDirectory />;
+  if (path === "vehicles") return <VehicleDirectory />;
+  const [section, id, tab, ...rest] = path.split("/");
+  if (section === "drivers" && id && !tab) {
+    const record = state.records.drivers.find(
+      (d) => d.id === id && d.market === state.market,
+    );
+    const person = record && fixturePerson(record.name);
+    if (record && person)
+      return <DriverDetail key={path} record={record} person={person} />;
+  }
+  if (
+    section === "vehicles" &&
+    id &&
+    designedVehicleTabs.includes(tab) &&
+    !rest.length
+  ) {
+    const record = state.records.vehicles.find(
+      (v) => v.id === id && v.market === state.market,
+    );
+    if (record) return <VehicleDetail key={path} tab={tab} record={record} />;
+  }
+  if (path === "maintenance") return <IssueDirectory />;
+  if (path === "team") return <TeamDirectory />;
+  if (designedReports.includes(path)) return <Reports key={path} path={path} />;
+  // Integrations stays the workflow empty state: no integration is confirmed (D-10).
+  if (designedSettings.includes(path)) return <Settings key={path} path={path} />;
+  if (section === "maintenance" && id && !tab) {
+    const record = state.records.issues.find(
+      (i) => i.id === id && i.market === state.market,
+    );
+    if (record) return <IssueDetail key={path} record={record} />;
+  }
+  if (section === "team" && id && !tab) {
+    const record = state.records.team.find(
+      (m) => m.id === id && m.market === state.market,
+    );
+    if (record) return <TeamDetail key={path} record={record} />;
+  }
+  if (path.startsWith("settings/support/")) {
+    const [, , ticketId, ticketTab] = path.split("/");
+    const record = state.records.tickets.find(
+      (t) => t.id === ticketId && t.market === state.market,
+    );
+    if (record && !ticketTab)
+      return <SupportTicket key={path} record={record} />;
+  }
+  return null;
+}
+const designedReports = ["reports", "reports/earnings", "reports/performance"];
+const designedSettings = [
+  "settings/profile",
+  "settings/policies",
+  "settings/billing",
+  "settings/notifications",
+  "settings/support",
+  "settings/audit",
+  "notifications",
+];
 
 const navigation = [
   { name: "Dashboard", path: "", icon: "imgGroup9" },
@@ -77,11 +174,13 @@ const navigation = [
       ["Overview", "settings"],
       ["Support Center", "settings/support"],
       ["Audit log", "settings/audit"],
+      ["Notifications", "notifications"],
     ],
   },
 ];
 
 export function FleetPortal({ path }: { path: string }) {
+  const { state } = usePreview();
   const [notice, setNotice] = useState("");
   const [menu, setMenu] = useState(false);
   const mobileMenu = useRef<HTMLDialogElement>(null);
@@ -114,14 +213,30 @@ export function FleetPortal({ path }: { path: string }) {
           />
         </Link>
         <nav aria-label="Fleet portal navigation">
+          <Link href={portalUrl("workflows")} className="fp-nav-item">
+            <span>All workflows</span>
+          </Link>
+          <Link href={portalUrl("onboarding/status")} className="fp-nav-item">
+            <span>Fleet application</span>
+          </Link>
           <Link href="/" className="fp-nav-item">
-            <ArrowLeft size={16} /><span>Back to home</span>
+            <ArrowLeft size={16} />
+            <span>Back to home</span>
           </Link>
           {navigation.map((item) => {
+            const within = (href: string) =>
+              path === href || path.startsWith(`${href}/`);
             const active =
               item.path === ""
                 ? path === ""
-                : path === item.path || path.startsWith(`${item.path}/`);
+                : within(item.path) ||
+                  !!item.children?.some(([, href]) => within(href));
+            // Deepest matching sub-item; sub-pages without their own entry fall back to the first.
+            const current = item.children
+              ?.map(([, href]) => href)
+              .filter(within)
+              .sort((a, b) => b.length - a.length)[0] ??
+              item.children?.[0][1];
             return (
               <div key={item.name}>
                 <Link
@@ -143,7 +258,7 @@ export function FleetPortal({ path }: { path: string }) {
                       <Link
                         href={portalUrl(href)}
                         key={href}
-                        aria-current={path === href ? "page" : undefined}
+                        aria-current={current === href ? "page" : undefined}
                         onClick={() => {
                           mobileMenu.current?.close();
                           setMenu(false);
@@ -180,21 +295,15 @@ export function FleetPortal({ path }: { path: string }) {
     );
   }
   let screen: ReactNode;
-  if (path === "") screen = <Dashboard />;
+  const designed = designedScreen(path, state);
+  if (designed) screen = designed;
+  else if (handlesWorkflow(path)) screen = <WorkflowScreen path={path} />;
+  else if (path === "") screen = <Dashboard />;
   else if (path === "drivers/invite") screen = <InviteDriver />;
-  else if (path === "drivers/chinedu") screen = <DriverDetail />;
-  else if (path.startsWith("vehicles/rav4/"))
-    screen = <VehicleDetail key={path} tab={path.split("/")[2]} />;
-  else if (path === "operations/trp-99321") screen = <TripDetail />;
-  else if (path === "operations") screen = <Operations />;
-  else if (path === "maintenance/iss-2711") screen = <IssueDetail />;
-  else if (path === "earnings") screen = <Earnings />;
-  else if (path.startsWith("payouts"))
-    screen = <Finance key={path} path={path} />;
-  else if (path.startsWith("reports"))
-    screen = <Reports key={path} path={path} />;
-  else if (path === "team/aisha") screen = <TeamDetail />;
-  else if (path === "settings/support/sr-202612") screen = <SupportTicket />;
+  else if (path === "operations/trp-99321")
+    screen = state.market === "NG" ? <TripDetail /> : <OperationsUnavailable trip />;
+  else if (path === "operations")
+    screen = state.market === "NG" ? <Operations /> : <OperationsUnavailable />;
   else if (path.startsWith("settings") || path === "notifications")
     screen = <Settings key={path} path={path} />;
   else screen = <Directory key={path} kind={path} />;
@@ -245,31 +354,52 @@ export function FleetPortal({ path }: { path: string }) {
             {sidebar()}
           </dialog>
           <main className="fp-main">
-            <div className="fp-top-controls">
-              <label className="fp-date">
-                <CalendarDays size={17} />
-                <input
-                  aria-label="Reporting date"
-                  type="date"
-                  defaultValue="2026-09-29"
-                />
-              </label>
-              <Link
-                href={portalUrl("notifications")}
-                className="fp-bell"
-                aria-label="Notifications"
-              >
-                <Bell size={18} />
-              </Link>
-              <Link
-                href={portalUrl("settings/profile")}
-                className="fp-initials"
-                aria-label="Account profile"
-              >
-                SE
-              </Link>
-            </div>
+            <PreviewToolbar>
+              <div className="fp-top-controls">
+                <label className="fp-date">
+                  <CalendarDays size={17} />
+                  <input
+                    aria-label="Reporting date"
+                    type="date"
+                    defaultValue="2026-09-29"
+                  />
+                </label>
+                <Link
+                  href={portalUrl("notifications")}
+                  className="fp-bell"
+                  aria-label="Notifications"
+                >
+                  <Bell size={18} />
+                </Link>
+                <Link
+                  href={portalUrl("settings/profile")}
+                  className="fp-initials"
+                  aria-label="Account profile"
+                >
+                  SE
+                </Link>
+              </div>
+            </PreviewToolbar>
             {screen}
+            {path.startsWith("operations") && (
+              <div className="fp-work-links">
+                {/* Sample trips and map exist only in the Nigeria preview. */}
+                {state.market === "NG" && (
+                  <p>
+                    Illustrative sample map · Last location update: 30 Oct 2026
+                    09:00 UTC · No live tracking
+                  </p>
+                )}
+                <Link href={portalUrl("assignments")}>
+                  Manage assignments →
+                </Link>
+                {state.market === "NG" && (
+                  <Link href={portalUrl("operations/trp-99321/exceptions")}>
+                    Trip exceptions →
+                  </Link>
+                )}
+              </div>
+            )}
             <p className="fp-preview-note">
               Design preview · Sample fleet data · Changes are local to this
               preview.
@@ -291,6 +421,7 @@ export function FleetPortal({ path }: { path: string }) {
 
 function Login() {
   const [message, setMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   function submit(e: FormEvent) {
     e.preventDefault();
     setMessage(
@@ -307,11 +438,7 @@ function Login() {
           width={1563}
           height={1043}
         />
-        <Link
-          href="/"
-          className="fp-login-logo"
-          aria-label="Sanga Ride home"
-        >
+        <Link href="/" className="fp-login-logo" aria-label="Sanga Ride home">
           <Asset
             screen="922:20482"
             name="imgGroup1000003111"
@@ -340,7 +467,10 @@ function Login() {
       </section>
       <section className="fp-login-content">
         <div>
-          <Link href="/" className="fp-back-home"><ArrowLeft size={16} /> Back to home</Link>
+          <Link href="/" className="fp-back-home">
+            <ArrowLeft size={16} /> Back to home
+          </Link>
+          <PreviewToolbar />
           <h2>
             Welcome to
             <br />
@@ -352,28 +482,32 @@ function Login() {
           <form onSubmit={submit} className="fp-login-form">
             <Field
               label="Email address"
-              type="email"
-              placeholder="Enter your work email"
+              type="text"
+              value="operator@example.invalid"
+              placeholder="Sample identifier"
             />
             <Field
               label="Password"
-              type="password"
-              placeholder="Enter your password"
+              type={showPassword ? "text" : "password"}
+              value="Preview-only-password"
+              placeholder="Sample password"
             />
+            <button
+              type="button"
+              className="fp-link"
+              onClick={() => setShowPassword((v) => !v)}
+            >
+              {showPassword ? "Hide" : "Show"} sample password
+            </button>
+            <p>
+              Preview only · Sample credentials are fixed; do not enter real
+              credentials.
+            </p>
             <div className="fp-login-options">
               <label>
                 <input type="checkbox" /> Remember me
               </label>
-              <button
-                type="button"
-                onClick={() =>
-                  setMessage(
-                    "Password recovery will be available when live sign-in is connected. Please contact Sanga Ride for account help.",
-                  )
-                }
-              >
-                Forgot Password?
-              </button>
+              <Link href={portalUrl("security/recover")}>Forgot Password?</Link>
             </div>
             <Button type="submit">Sign in</Button>
             <div className="fp-or">
@@ -408,6 +542,14 @@ function Login() {
               </p>
             )}
           </form>
+          <div className="fp-work-links">
+            <Link href={portalUrl("onboarding/start")}>
+              Apply as a fleet partner →
+            </Link>
+            <Link href={portalUrl("security/verify")}>
+              Step-up verification preview →
+            </Link>
+          </div>
           <div className="fp-login-preview">
             <span>Frontend design preview · No live account required</span>
             <Link href={portalUrl()}>

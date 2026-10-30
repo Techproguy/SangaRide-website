@@ -1,8 +1,16 @@
 "use client";
 import Link from "next/link";
+import { usePreview } from "./PreviewProvider";
 import { useState } from "react";
 import { ChevronRight, LocateFixed, Minus, Plus } from "lucide-react";
 import { people, portalUrl } from "@/lib/fleet-portal";
+import {
+  allocation,
+  formatMoney,
+  marketConfig,
+} from "@/lib/fleet-preview-domain";
+import { AllocationBreakdown, FinanceLinks } from "./FinanceWorkflows";
+import { PreviewBanner } from "./WorkflowUI";
 import {
   Asset,
   Badge,
@@ -23,6 +31,8 @@ export function Trend({
   large?: boolean;
   report?: boolean;
 }) {
+  const { state } = usePreview();
+  const symbol = state.market === "NG" ? "₦" : "$";
   const [period, setPeriod] = useState("Last 7 days");
   return (
     <Panel
@@ -42,7 +52,13 @@ export function Trend({
         role="img"
       >
         <div className="fp-chart-y">
-          {["₦400k", "₦300k", "₦200k", "₦100k", "0"].map((t) => (
+          {[
+            `${symbol}400k`,
+            `${symbol}300k`,
+            `${symbol}200k`,
+            `${symbol}100k`,
+            "0",
+          ].map((t) => (
             <span key={t}>{t}</span>
           ))}
         </div>
@@ -122,9 +138,49 @@ export function Trend({
     </Panel>
   );
 }
+/** Illustrative gross fares for the selected period, in minor units of each market's currency. */
+export const sampleGross = { NG: 342_560_000, US: 4_862_000 } as const;
+const serviceShares = [
+  ["Standard Ride", 5660],
+  ["Airport Ride", 2000],
+  ["Deliveries", 1200],
+  ["Scheduled Rides", 1140],
+] as const;
+const tripCounts = [
+  ["Completed", 1520],
+  ["In progress", 180],
+  ["Cancelled", 92],
+  ["No show", 50],
+] as const;
+/** Whole percentages that always total 100 (largest remainder). */
+function percentages(values: number[]) {
+  const total = values.reduce((a, b) => a + b, 0);
+  const exact = values.map((v) => (v * 100) / total);
+  const result = exact.map(Math.floor);
+  const order = exact
+    .map((v, i) => [v - Math.floor(v), i])
+    .sort((a, b) => b[0] - a[0]);
+  for (let k = 0; k < 100 - result.reduce((a, b) => a + b, 0); k++)
+    result[order[k][1]]++;
+  return result;
+}
 export function Breakdown({ earnings = false }: { earnings?: boolean }) {
+  const { state } = usePreview();
+  const gross = sampleGross[state.market];
+  // Whole currency units; the last share takes the remainder so the parts sum to the total.
+  const amounts = serviceShares.map(
+    ([, bps]) => Math.round((gross * bps) / 1_000_000) * 100,
+  );
+  amounts[amounts.length - 1] =
+    gross - amounts.slice(0, -1).reduce((a, b) => a + b, 0);
+  const rows: [string, string][] = earnings
+    ? serviceShares.map(([name], i) => [name, formatMoney(amounts[i], state.market)])
+    : tripCounts.map(([name, n]) => [name, n.toLocaleString("en-US")]);
+  const shares = percentages(
+    earnings ? amounts : tripCounts.map(([, n]) => n),
+  );
   return (
-    <Panel title={earnings ? "Earnings Breakdown" : "Earnings Trend"}>
+    <Panel title={earnings ? "Earnings Breakdown" : "Trip Status"}>
       <div className="fp-breakdown">
         <div
           className="fp-donut"
@@ -156,25 +212,23 @@ export function Breakdown({ earnings = false }: { earnings?: boolean }) {
             height={25}
           />
           <span>
-            <strong>{earnings ? "₦3.4M" : "1,842"}</strong>
+            <strong>
+              {earnings
+                ? new Intl.NumberFormat(
+                    state.market === "NG" ? "en-NG" : "en-US",
+                    {
+                      style: "currency",
+                      currency: marketConfig[state.market].currency,
+                      notation: "compact",
+                    },
+                  ).format(gross / 100)
+                : "1,842"}
+            </strong>
             <small>{earnings ? "Total Earnings" : "Total trips"}</small>
           </span>
         </div>
         <ul className="fp-legend">
-          {(earnings
-            ? [
-                ["Standard Ride", "₦1,940,200", "83%"],
-                ["Airport Ride", "₦684,120", "10%"],
-                ["Deliveries", "₦410,880", "5%"],
-                ["Scheduled Rides", "₦116,800", "8%"],
-              ]
-            : [
-                ["Completed", "1,520", "83%"],
-                ["In progress", "180", "10%"],
-                ["Cancelled", "92", "5%"],
-                ["No show", "50", "8%"],
-              ]
-          ).map(([name, n, p], i) => (
+          {rows.map(([name, n], i) => (
             <li key={name}>
               <i
                 style={{
@@ -183,7 +237,7 @@ export function Breakdown({ earnings = false }: { earnings?: boolean }) {
               />
               <span>{name}</span>
               <small>
-                {n} ({p})
+                {n} ({shares[i]}%)
               </small>
             </li>
           ))}
@@ -253,26 +307,51 @@ export function RecentTrips({ full = false }: { full?: boolean }) {
   );
 }
 export function Dashboard() {
+  const { state } = usePreview();
+  const drivers = state.records.drivers.filter(
+    (r) => r.market === state.market,
+  );
+  const vehicles = state.records.vehicles.filter(
+    (r) => r.market === state.market,
+  );
+  const issues = state.records.issues.filter(
+    (r) => r.market === state.market && r.status !== "resolved",
+  );
   return (
     <>
       <Header
-        title="Lagos Move Fleet"
+        title={state.market === "NG" ? "Lagos Move Fleet" : "Sample US Fleet"}
         eyebrow="Welcome back,"
-        description="Here’s what is happening with your fleet today"
+        description="Shared sample records · Charts and trip history are illustrative fixtures"
       />
       <Stats
         items={[
-          { label: "Active Drivers", value: "150", hint: "Out of 200 drivers" },
+          {
+            label: "Eligible Drivers",
+            value: String(
+              drivers.filter((r) => ["active", "eligible"].includes(r.status))
+                .length,
+            ),
+            hint: `${drivers.length} sample drivers`,
+          },
           {
             label: "Active Vehicles",
-            value: "148",
-            hint: "Out of 200 vehicles",
+            value: String(vehicles.filter((r) => r.status === "active").length),
+            hint: `${vehicles.length} sample vehicles`,
           },
-          { label: "Total trips", value: "150", hint: "Out of 200 trips" },
           {
-            label: "Active Drivers",
-            value: "150",
-            hint: "Out of 200 drivers",
+            label: "Assignments",
+            value: String(
+              state.records.assignments.filter(
+                (r) => r.market === state.market && r.status === "active",
+              ).length,
+            ),
+            hint: "Active sample assignments",
+          },
+          {
+            label: "Open Issues",
+            value: String(issues.length),
+            hint: "Sample maintenance cases",
             tone: "green",
           },
         ]}
@@ -282,7 +361,13 @@ export function Dashboard() {
         <Breakdown />
       </div>
       <div className="fp-two fp-dashboard-bottom">
-        <RecentTrips />
+        {state.market === "NG" ? (
+          <RecentTrips />
+        ) : (
+          <Panel title="Trip history">
+            <p>No sample US trip records. No live trip service is connected.</p>
+          </Panel>
+        )}
         <Panel
           title="Fleet Health"
           action={
@@ -293,12 +378,34 @@ export function Dashboard() {
         >
           <ul className="fp-health">
             {[
-              ["Driver’s online", "152", "drivers", "imgGroup"],
-              ["Driver’s offline", "48", "drivers", "imgGroup1"],
-              ["Vehicles active", "152", "vehicles", "imgGroup1000003124"],
               [
-                "Vehicles due for service",
-                "152",
+                "Eligible drivers",
+                String(
+                  drivers.filter((r) =>
+                    ["active", "eligible"].includes(r.status),
+                  ).length,
+                ),
+                "drivers",
+                "imgGroup",
+              ],
+              [
+                "Verification pending",
+                String(
+                  drivers.filter((r) => r.status === "verification_pending")
+                    .length,
+                ),
+                "drivers",
+                "imgGroup1",
+              ],
+              [
+                "Vehicles active",
+                String(vehicles.filter((r) => r.status === "active").length),
+                "vehicles",
+                "imgGroup1000003124",
+              ],
+              [
+                "Open maintenance cases",
+                String(issues.length),
                 "maintenance",
                 "imgGroup1000003125",
               ],
@@ -396,6 +503,27 @@ export function FleetMap({ trip = false }: { trip?: boolean }) {
     </div>
   );
 }
+/** Operations sample data is Nigeria-only; other markets get an honest empty state, not NG trips. */
+export function OperationsUnavailable({ trip = false }: { trip?: boolean }) {
+  const { state } = usePreview();
+  return (
+    <>
+      <Header
+        title={trip ? "Trip not in this market" : "Fleet Operations"}
+        description="Monitor active drivers, vehicle locations and ongoing trips. Locations show their last update time; no live telemetry is connected."
+        back={trip ? { label: "Back to Trips", path: "operations" } : undefined}
+      />
+      <PreviewBanner />
+      <Panel title="No sample trips">
+        <p className="fp-muted">
+          The {marketConfig[state.market].name} preview has no sample trips.
+          Switch the market to Nigeria to explore the illustrative operations
+          view.
+        </p>
+      </Panel>
+    </>
+  );
+}
 export function Operations() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All statuses");
@@ -405,7 +533,7 @@ export function Operations() {
     <>
       <Header
         title="Fleet Operations"
-        description="Monitor your fleet in real time. Track active drivers, vehicle locations and ongoing trips"
+        description="Monitor active drivers, vehicle locations and ongoing trips. Locations show their last update time; no live telemetry is connected."
       />
       <Stats
         items={[
@@ -475,40 +603,47 @@ export function Operations() {
   );
 }
 export function Earnings() {
+  const { state } = usePreview();
+  const money = (n: number) => formatMoney(n, state.market);
+  // Same illustrative rates as the breakdown panel: Sanga's fee comes off first (LOCK-02).
+  const split = allocation(sampleGross[state.market], 1500, 2000);
   return (
     <>
       <Header
         title="Earning Overview"
         description="Track your fleet’s earnings, commissions and driver payouts. View performance trends and transaction breakdowns"
       />
+      <PreviewBanner />
       <Stats
         items={[
           {
             label: "Total Earnings",
-            value: "₦3,425,600",
-            hint: "vs. previous month",
+            value: money(split.gross),
+            hint: "Gross sample fares",
             tone: "green",
           },
           {
             label: "Your Commission",
-            value: "₦342,560",
-            hint: "vs. previous month",
+            value: money(split.fleet),
+            hint: `Fleet share after ${money(split.sanga)} Sanga fee`,
             tone: "orange",
           },
           {
             label: "Driver Payouts",
-            value: "₦2,980,400",
-            hint: "vs. previous month",
+            value: money(split.driver),
+            hint: "Driver share after Sanga fee",
           },
           {
             label: "Completed Trips",
-            value: "1,842",
-            hint: "vs. previous month",
+            value: "1,520",
+            hint: "Sample period",
           },
         ]}
       />
       <Trend large />
       <Breakdown earnings />
+      <AllocationBreakdown />
+      <FinanceLinks />
     </>
   );
 }

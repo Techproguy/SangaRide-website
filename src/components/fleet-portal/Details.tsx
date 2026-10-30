@@ -19,9 +19,26 @@ import {
   Person,
   Stats,
   Tabs,
-  useNotice,
+  statusLabel,
 } from "./ui";
-import { FleetMap, Trend } from "./Overview";
+import { FleetMap, Trend, sampleGross } from "./Overview";
+import {
+  allocation,
+  formatMoney,
+  marketConfig,
+  type PreviewRecord,
+} from "@/lib/fleet-preview-domain";
+import {
+  fixturePerson,
+  fixtureVehicle,
+  memberEmail,
+  perTrip,
+  roleLabel,
+  samplePhone,
+  samplePlaces,
+} from "./Directory";
+import { usePreview } from "./PreviewProvider";
+import { PreviewBanner } from "./WorkflowUI";
 
 const vehicleTabs = [
   ["Overview", "overview"],
@@ -31,23 +48,25 @@ const vehicleTabs = [
   ["Trip History", "trips"],
   ["Earnings", "earnings"],
 ];
-export function VehicleBanner() {
+export function VehicleBanner({ record }: { record: PreviewRecord }) {
+  const fixture = fixtureVehicle(record.name);
   return (
     <div className="fp-entity-banner">
       <Asset
         screen="922:13308"
-        name="imgFavpng885D290E782F4F3Ce6D77D44Cefe13C81"
+        name={fixture?.image ?? "imgFavpng885D290E782F4F3Ce6D77D44Cefe13C81"}
         width={258}
         height={135}
         className="fp-entity-car"
-        alt="Toyota Rav4"
+        alt={record.name}
       />
       <div>
         <h1>
-          Toyota Rav4 <Badge>Active</Badge>
+          {record.name} <Badge>{record.status}</Badge>
         </h1>
         <p>
-          <span className="fp-id">LND-204-BD</span> 2021 | Sanga Plus
+          <span className="fp-id">{record.fields.plate ?? "No plate"}</span>{" "}
+          2021 | {record.fields.service ?? "Service pending"}
         </p>
         <div className="fp-vehicle-specs">
           <span>
@@ -57,7 +76,7 @@ export function VehicleBanner() {
               width={20}
               height={20}
             />
-            4 Seat
+            {record.fields.seats ?? "—"} Seat
           </span>
           <span>
             <Asset
@@ -75,7 +94,7 @@ export function VehicleBanner() {
               width={20}
               height={20}
             />
-            Sedan
+            {fixture?.type ?? "—"}
           </span>
         </div>
       </div>
@@ -96,15 +115,33 @@ function EditButton({
     </button>
   );
 }
-export function VehicleDetail({ tab }: { tab: string }) {
+export function VehicleDetail({
+  tab,
+  record,
+}: {
+  tab: string;
+  record: PreviewRecord;
+}) {
   const [edit, setEdit] = useState("");
-  const [assignment, setAssignment] = useState("Chinedu Okafor");
-  const [driver, setDriver] = useState("Chinedu Okafor");
   const [docFilter, setDocFilter] = useState("All Documents (6)");
   const [extraDocs, setExtraDocs] = useState<string[]>([]);
   const [selectedDocument, setSelectedDocument] = useState("");
-  const [vehicleName, setVehicleName] = useState("Toyota");
-  const notice = useNotice();
+  const [make, model = ""] = record.name.split(/\s+(.*)/);
+  const [vehicleName, setVehicleName] = useState(make);
+  const { state } = usePreview();
+  const money = (n: number) => formatMoney(n, state.market);
+  // Assignments go through the validated workflow; the designed tab only reflects the store.
+  const active = state.records.assignments.find(
+    (a) => a.status === "active" && a.fields.vehicle === record.id,
+  );
+  const driverRecord = state.records.drivers.find(
+    (d) => d.id === active?.fields.driver,
+  );
+  const assignedPerson = driverRecord && fixturePerson(driverRecord.name);
+  const issues = state.records.issues.filter(
+    (i) => i.fields.vehicle === record.id,
+  );
+  const split = allocation(sampleGross[state.market] / 20, 1500, 2000);
   const documents = [
     "Vehicle Registration",
     "Insurance Certificate",
@@ -117,14 +154,26 @@ export function VehicleDetail({ tab }: { tab: string }) {
   return (
     <>
       <Header title="" back={{ label: "Back to Vehicles", path: "vehicles" }} />
-      <VehicleBanner />
+      <PreviewBanner />
+      <VehicleBanner record={record} />
       <Tabs
         active={vehicleTabs.find((t) => t[1] === tab)?.[0] ?? "Overview"}
         items={vehicleTabs.map(([label, key]) => ({
           label,
-          path: `vehicles/rav4/${key}`,
+          path: `vehicles/${record.id}/${key}`,
         }))}
       />
+      <div className="fp-work-links">
+        {[
+          ["Edit vehicle", "edit"],
+          ["Review status", "review"],
+          ["Suspend / retire / reactivate", "manage"],
+        ].map(([label, key]) => (
+          <Link key={key} href={portalUrl(`vehicles/${record.id}/${key}`)}>
+            {label} →
+          </Link>
+        ))}
+      </div>
       {tab === "overview" ? (
         <>
           <div className="fp-two">
@@ -137,15 +186,15 @@ export function VehicleDetail({ tab }: { tab: string }) {
               <KeyValues
                 items={[
                   ["Make", vehicleName],
-                  ["Model", "Rav4"],
+                  ["Model", model],
                   ["Year", "2021"],
-                  ["Plate Number", "LND-204-BD"],
+                  ["Plate Number", record.fields.plate ?? "—"],
                   ["VIN", "JTNB4MBE9M213456"],
                   ["Vehicle Type", "Economy"],
                   ["Fuel Type", "Petrol"],
                   ["Transmission", "Automatic"],
-                  ["Seating Capacity", "5"],
-                  ["Status", <Badge key="s">Active</Badge>],
+                  ["Seating Capacity", record.fields.seats ?? "—"],
+                  ["Status", <Badge key="s">{record.status}</Badge>],
                   ["Date Added", "12 Jan 2024"],
                 ]}
               />
@@ -156,15 +205,20 @@ export function VehicleDetail({ tab }: { tab: string }) {
                 action={
                   <Link
                     className="fp-text-link"
-                    href={portalUrl("vehicles/rav4/assignments")}
+                    href={portalUrl(`vehicles/${record.id}/assignments`)}
                   >
                     Change
                   </Link>
                 }
               >
-                <Person large name={assignment || "Unassigned"} />
-                <p className="fp-muted">Assigned since 15 Jan 2024</p>
-                <Badge>Active</Badge>
+                {assignedPerson ? (
+                  <>
+                    <Person large index={assignedPerson.index} />
+                    <Badge>Active</Badge>
+                  </>
+                ) : (
+                  <p className="fp-muted">No active driver assignment.</p>
+                )}
               </Panel>
               <Panel
                 title="Key Dates"
@@ -184,7 +238,10 @@ export function VehicleDetail({ tab }: { tab: string }) {
           <Stats
             items={[
               { label: "Total Trips (Last 30 Days)", value: "150" },
-              { label: "Total Earning (Last 30 Days)", value: "₦142,500" },
+              {
+                label: "Total Earning (Last 30 Days)",
+                value: money(split.gross),
+              },
               { label: "Average Rating", value: "4.8" },
             ]}
           />
@@ -267,51 +324,35 @@ export function VehicleDetail({ tab }: { tab: string }) {
         <>
           <div className="fp-two">
             <Panel title="Current Assignment">
-              <Person large name={assignment || "No driver assigned"} />
-              <p className="fp-contact">
-                <Phone size={14} />
-                0803 123 4567
-              </p>
-              <p className="fp-contact">
-                <Mail size={14} />
-                chinedu.okafor@gmail.com
-              </p>
-              <KeyValues
-                items={[
-                  ["Assigned since", "15 Jan 2024"],
-                  ["Duration", "8 Months"],
-                ]}
-              />
-              <Button
-                secondary
-                onClick={() => {
-                  setAssignment("");
-                  notice("Assignment removed from this preview only.");
-                }}
-              >
-                <Trash2 size={15} />
-                Remove Assignment
-              </Button>
+              {active && assignedPerson ? (
+                <>
+                  <Person large index={assignedPerson.index} />
+                  <p className="fp-contact">
+                    <Phone size={14} />
+                    {samplePhone(assignedPerson.phone, state.market)}
+                  </p>
+                  <KeyValues
+                    items={[
+                      ["Assignment", active.id],
+                      ["Status", <Badge key="s">{active.status}</Badge>],
+                    ]}
+                  />
+                  <Button secondary href={`assignments/${active.id}`}>
+                    <Trash2 size={15} />
+                    Remove Assignment
+                  </Button>
+                </>
+              ) : (
+                <p className="fp-muted">No driver assigned.</p>
+              )}
             </Panel>
             <Panel title="Assign a Driver">
               <p className="fp-muted">
-                Search and select driver to assign to this vehicle
+                Driver licence, vehicle documents, open maintenance holds and
+                overlapping assignments are checked before an assignment is
+                created.
               </p>
-              <Dropdown
-                label="Select driver to assign"
-                options={people.map((p) => p.name)}
-                value={driver}
-                onChange={setDriver}
-              />
-              <Person name={driver} />
-              <Button
-                onClick={() => {
-                  setAssignment(driver);
-                  notice(`${driver} assigned in this preview only.`);
-                }}
-              >
-                Assign Driver
-              </Button>
+              <Button href="assignments/new">Assign Driver</Button>
             </Panel>
           </div>
           <DataTable
@@ -343,10 +384,30 @@ export function VehicleDetail({ tab }: { tab: string }) {
           <Stats
             items={(tab === "maintenance"
               ? [
-                  ["Total Issues", "24"],
-                  ["In Progress", "2"],
-                  ["Resolved", "24"],
-                  ["Overdue", "24"],
+                  ["Total Issues", String(issues.length)],
+                  [
+                    "In Progress",
+                    String(
+                      issues.filter((i) =>
+                        ["triaged", "in_progress"].includes(i.status),
+                      ).length,
+                    ),
+                  ],
+                  [
+                    "Resolved",
+                    String(issues.filter((i) => i.status === "resolved").length),
+                  ],
+                  [
+                    "Open",
+                    String(
+                      issues.filter(
+                        (i) =>
+                          !["resolved", "cancelled_as_duplicate"].includes(
+                            i.status,
+                          ),
+                      ).length,
+                    ),
+                  ],
                 ]
               : tab === "trips"
                 ? [
@@ -356,10 +417,10 @@ export function VehicleDetail({ tab }: { tab: string }) {
                     ["Cancelled", "35"],
                   ]
                 : [
-                    ["Total Earnings", "₦3,425,600"],
-                    ["Your Commission", "₦342,560"],
-                    ["Driver Payouts", "₦2,980,400"],
-                    ["Completed Trips", "1,842"],
+                    ["Total Earnings", money(split.gross)],
+                    ["Your Commission", money(split.fleet)],
+                    ["Driver Payouts", money(split.driver)],
+                    ["Completed Trips", "120"],
                   ]
             ).map(([label, value]) => ({ label, value }))}
           />
@@ -390,28 +451,24 @@ export function VehicleDetail({ tab }: { tab: string }) {
                     "Status",
                   ]
             }
-            rows={people.slice(0, 6).map((p, i) => ({
-              key: p.id,
-              cells:
-                tab === "maintenance"
-                  ? [
-                      "ISS-20212-024",
-                      <Person index={i} key="p" />,
-                      [
-                        "Engine",
-                        "Brakes",
-                        "Tyre",
-                        "Battery",
-                        "Suspension",
-                        "AC",
-                      ][i],
-                      "30 Sep 2026",
-                      <Badge key="s">In Progress</Badge>,
-                      <Button href="maintenance/iss-2711" key="a">
+            rows={
+              tab === "maintenance"
+                ? issues.map((issue) => ({
+                    key: issue.id,
+                    cells: [
+                      issue.id.toUpperCase(),
+                      issue.fields.owner ?? "—",
+                      issue.name,
+                      "30 Oct 2026",
+                      <Badge key="s">{issue.status}</Badge>,
+                      <Button href={`maintenance/${issue.id}`} key="a">
                         View details
                       </Button>,
-                    ]
-                  : [
+                    ],
+                  }))
+                : people.slice(0, 6).map((p, i) => ({
+              key: p.id,
+              cells: [
                       <Person index={0} key="p" />,
                       [
                         "Drop",
@@ -421,10 +478,10 @@ export function VehicleDetail({ tab }: { tab: string }) {
                         "Drop",
                         "Drop",
                       ][i],
-                      "Ikeja City Mall",
-                      i ? "Banana Island" : "Victoria Island",
+                      samplePlaces[state.market][0],
+                      samplePlaces[state.market][i ? 2 : 1],
                       "2 Sep 26 10:00 AM",
-                      tab === "earnings" ? "₦5,000" : "11:00 AM",
+                      tab === "earnings" ? money(500_000) : "11:00 AM",
                       <Badge key="s">
                         {i === 0
                           ? "On Trip"
@@ -433,7 +490,8 @@ export function VehicleDetail({ tab }: { tab: string }) {
                             : "Completed"}
                       </Badge>,
                     ],
-            }))}
+            }))
+            }
           />
         </>
       )}
@@ -488,7 +546,7 @@ export function VehicleDetail({ tab }: { tab: string }) {
               />
               <Field
                 label={edit === "Key Dates" ? "Insurance Expiry" : "Model"}
-                defaultValue={edit === "Key Dates" ? "2027-02-10" : "Rav4"}
+                defaultValue={edit === "Key Dates" ? "2027-02-10" : model}
               />
             </DemoForm>
           )}
@@ -498,24 +556,57 @@ export function VehicleDetail({ tab }: { tab: string }) {
   );
 }
 
-export function DriverDetail() {
+export function DriverDetail({
+  record,
+  person,
+}: {
+  record: PreviewRecord;
+  person: NonNullable<ReturnType<typeof fixturePerson>>;
+}) {
   const [tab, setTab] = useState("Overview");
   const [edit, setEdit] = useState(false);
+  const { state } = usePreview();
+  const money = (n: number) => formatMoney(n, state.market);
+  const email = `${person.name.replace(/\s+/g, "").toLowerCase()}@example.invalid`;
+  const phone = samplePhone(person.phone, record.market);
+  const vehicle = state.records.vehicles.find(
+    (v) =>
+      v.id ===
+      state.records.assignments.find(
+        (a) => a.status === "active" && a.fields.driver === record.id,
+      )?.fields.vehicle,
+  );
   return (
     <>
       <Header title="" back={{ label: "Back to Drivers", path: "drivers" }} />
+      <PreviewBanner />
       <div className="fp-profile-header">
-        <Person large screen="922:19307" />
+        <Person large index={person.index} screen="922:19307" />
         <div>
-          <h1>Chinedu Okafor</h1>
-          <span className="fp-id">DRV-7821</span> <Badge>Verified</Badge>
+          <h1>{record.name}</h1>
+          <span className="fp-id">{person.id}</span>{" "}
+          <Badge>{record.status}</Badge>
           <p className="fp-contact">
             <Phone size={15} />
-            08022024007 <Mail size={15} />
-            Chineduokafor@gmail.com{" "}
-            <span>Lagos, Nigeria · Joined 12 Jun 2024</span>
+            {phone} <Mail size={15} />
+            {email}{" "}
+            <span>
+              {marketConfig[record.market].name} · Joined 12 Jun 2024
+            </span>
           </p>
         </div>
+      </div>
+      <div className="fp-work-links">
+        {[
+          ["Verification", "verification"],
+          ["Activation", "activation"],
+          ["Suspend / reactivate / remove", "manage"],
+          ["Driver split", "split"],
+        ].map(([label, key]) => (
+          <Link key={key} href={portalUrl(`drivers/${record.id}/${key}`)}>
+            {label} →
+          </Link>
+        ))}
       </div>
       <Tabs
         active={tab}
@@ -537,21 +628,21 @@ export function DriverDetail() {
             >
               <KeyValues
                 items={[
-                  ["Full name", "Chinedu Okafor"],
-                  ["Phone number", "08022024007"],
-                  ["Email address", "Chineduokafor@gmail.com"],
+                  ["Full name", record.name],
+                  ["Phone number", phone],
+                  ["Email address", email],
                   ["Date of birth", "14 May 1990"],
-                  ["Address", "Ikeja, Lagos Nigeria"],
-                  ["Driver I.D", "DRV-7821"],
-                  ["Status", "Active"],
-                  ["Verification", <Badge key="v">Verified</Badge>],
+                  ["Market", marketConfig[record.market].name],
+                  ["Driver I.D", person.id],
+                  ["Presence", record.fields.presence ?? "Unknown"],
+                  ["Eligibility", <Badge key="v">{record.status}</Badge>],
                 ]}
               />
             </Panel>
             <Panel title="Performance (last 30 days)">
               <Stats
                 items={[
-                  { label: "Total trips", value: "152" },
+                  { label: "Total trips", value: String(person.trips) },
                   { label: "Completion rate", value: "98%" },
                   { label: "Average rating", value: "4.0 ★" },
                 ]}
@@ -567,9 +658,9 @@ export function DriverDetail() {
               key: p.id,
               cells: [
                 "29 Sep 2026 10:24 AM",
-                "Ikeja City Mall",
-                "Victoria Island",
-                "₦3,800",
+                samplePlaces[record.market][0],
+                samplePlaces[record.market][1],
+                money(380_000),
                 <Badge key="s">{i ? "Completed" : "In progress"}</Badge>,
               ],
             }))}
@@ -577,18 +668,33 @@ export function DriverDetail() {
         </>
       ) : tab === "Vehicle" ? (
         <Panel title="Assigned Vehicle">
-          <VehicleBanner />
-          <Button href="vehicles/rav4/overview">View vehicle</Button>
+          {vehicle ? (
+            <>
+              <VehicleBanner record={vehicle} />
+              <Button href={`vehicles/${vehicle.id}/overview`}>
+                View vehicle
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="fp-muted">No active vehicle assignment.</p>
+              <Button href="assignments/new">Assign a vehicle</Button>
+            </>
+          )}
         </Panel>
       ) : tab === "Documents" ? (
         <DataTable
           headers={["Document", "Status", "Expiry date", "Action"]}
           rows={["Driver’s license", "Identity document", "Profile photo"].map(
-            (d) => ({
+            (d, i) => ({
               key: d,
               cells: [
                 d,
-                <Badge key="s">Valid</Badge>,
+                <Badge key="s">
+                  {i === 0 && record.fields.license === "expired"
+                    ? "Expired"
+                    : "Valid"}
+                </Badge>,
                 "12 Jan 2027",
                 <Button secondary key="b" onClick={() => setEdit(true)}>
                   View details
@@ -601,8 +707,11 @@ export function DriverDetail() {
         <>
           <Stats
             items={[
-              { label: "Total Earnings", value: "₦142,500" },
-              { label: "Completed trips", value: "152" },
+              {
+                label: "Total Earnings",
+                value: money(person.trips * perTrip[state.market]),
+              },
+              { label: "Completed trips", value: String(person.trips) },
             ]}
           />
           <Trend />
@@ -611,12 +720,9 @@ export function DriverDetail() {
       {edit && (
         <Dialog title="Driver information" onClose={() => setEdit(false)}>
           <DemoForm onSave={() => setEdit(false)}>
-            <Field label="Full name" defaultValue="Chinedu Okafor" />
-            <Field label="Phone number" defaultValue="08022024007" />
-            <Field
-              label="Email address"
-              defaultValue="Chineduokafor@gmail.com"
-            />
+            <Field label="Full name" defaultValue={record.name} />
+            <Field label="Phone number" defaultValue={phone} />
+            <Field label="Email address" defaultValue={email} />
           </DemoForm>
         </Dialog>
       )}
@@ -624,23 +730,70 @@ export function DriverDetail() {
   );
 }
 
-export function TeamDetail() {
+const accessByRole: Record<string, [string, string][]> = {
+  Owner: [
+    ["Drivers", "Full Access"],
+    ["Vehicles", "Full Access"],
+    ["Trip & Live Operations", "Full Access"],
+    ["Earnings & Payouts", "Full Access"],
+    ["Team Management", "Full Access"],
+    ["Settings", "Full Access"],
+  ],
+  Operations: [
+    ["Drivers", "Full Access"],
+    ["Vehicles", "Full Access"],
+    ["Trip & Live Operations", "Full Access"],
+    ["Earnings & Payouts", "No Access"],
+    ["Team Management", "No Access"],
+    ["Settings", "View Only"],
+  ],
+  "Read-only": [
+    ["Drivers", "View Only"],
+    ["Vehicles", "View Only"],
+    ["Trip & Live Operations", "View Only"],
+    ["Earnings & Payouts", "View Only"],
+    ["Team Management", "No Access"],
+    ["Settings", "No Access"],
+  ],
+};
+
+/** F06-02 on the FLT 018 layout. Role and access changes go through the reviewed workflow. */
+export function TeamDetail({ record }: { record: PreviewRecord }) {
   const [tab, setTab] = useState("Overview");
-  const [role, setRole] = useState("Fleet Manager");
-  const [edit, setEdit] = useState(false);
+  const { state } = usePreview();
+  const person = fixturePerson(record.name);
+  const role = roleLabel[record.fields.role] ?? record.fields.role ?? "—";
+  const access = accessByRole[record.fields.role] ?? accessByRole["Read-only"];
+  const activity = state.audit.filter(
+    (e) => e.fields.collection === "team" && e.fields.target === record.id,
+  );
   return (
     <>
       <Header title="" back={{ label: "Back to Team Members", path: "team" }} />
+      <PreviewBanner />
       <div className="fp-profile-header">
-        <Person large name="Aisha Bello" screen="922:17128" />
+        {person && <Person large index={person.index} screen="922:17128" />}
         <div>
-          <h1>Aisha Bello</h1>
-          <span className="fp-id">{role}</span> <Badge>Active</Badge>
+          <h1>{record.name}</h1>
+          <span className="fp-id">{role}</span> <Badge>{record.status}</Badge>
           <p className="fp-contact">
-            08022024007 · Aishasanga@gmail.com · Joined 12 Jun 2024 · Last
-            active Today, 09:15 AM
+            {memberEmail(record.name)} · {marketConfig[record.market].name} ·
+            Joined 12 Jun 2024
           </p>
         </div>
+      </div>
+      <div className="fp-work-links">
+        {[
+          ["Change role and scope", `team/${record.id}/permissions`],
+          ["Suspend / revoke access", `team/${record.id}/manage`],
+          ...(record.fields.role === "Owner"
+            ? [["Transfer ownership", "team/ownership-transfer"]]
+            : []),
+        ].map(([label, href]) => (
+          <Link key={href} href={portalUrl(href)}>
+            {label} →
+          </Link>
+        ))}
       </div>
       <Tabs
         active={tab}
@@ -648,108 +801,96 @@ export function TeamDetail() {
         items={[{ label: "Overview" }, { label: "Activity Log" }]}
       />
       {tab === "Activity Log" ? (
-        <DataTable
-          headers={["Date", "Action", "Module"]}
-          rows={["Signed in", "Viewed dashboard", "Updated driver profile"].map(
-            (a, i) => ({
-              key: a,
-              cells: [`30 Sep 2026 ${9 + i}:15 AM`, a, "Fleet"],
-            }),
-          )}
-        />
+        activity.length ? (
+          <DataTable
+            headers={["Event", "Change", "Reason", "Correlation"]}
+            rows={activity.map((e) => ({
+              key: e.id,
+              cells: [
+                e.id,
+                <Badge key="s">{e.status}</Badge>,
+                e.fields.reason ?? "—",
+                e.fields.correlationId ?? "—",
+              ],
+            }))}
+          />
+        ) : (
+          <Panel title="No activity yet">
+            <p className="fp-muted">
+              Role and access changes made in this preview appear here.
+            </p>
+          </Panel>
+        )
       ) : (
         <div className="fp-two">
           <div className="fp-stack">
-            <Panel
-              title="Personal Information"
-              action={<EditButton onClick={() => setEdit(true)} />}
-            >
+            <Panel title="Personal Information">
               <KeyValues
                 items={[
-                  ["Full name", "Aisha Bello"],
-                  ["Phone number", "08022024007"],
-                  ["Email address", "aishasanga@gmail.com"],
+                  ["Full name", record.name],
+                  ["Email address", memberEmail(record.name)],
                   ["Role", role],
-                  ["Status", <Badge key="s">Active</Badge>],
-                  ["Date Joined", "12 Jan 2024"],
+                  ["Market scope", record.fields.scope ?? record.market],
+                  ["Status", <Badge key="s">{record.status}</Badge>],
+                  ["Date Joined", "12 Jun 2024"],
                 ]}
               />
             </Panel>
             <Panel title="Access Summary">
-              <KeyValues
-                items={[
-                  ["Drivers", "Full Access"],
-                  ["Vehicles", "Full Access"],
-                  ["Trip & Live Operations", "View Only"],
-                  ["Earnings & Payouts", "View Only"],
-                  ["Team Management", "No Access"],
-                  ["Settings", "No Access"],
-                ]}
-              />
+              <KeyValues items={access} />
             </Panel>
           </div>
           <Panel title="Role & Permissions">
-            <DemoForm>
-              <Field label="Current Role">
-                <Dropdown
-                  label="Current Role"
-                  value={role}
-                  onChange={setRole}
-                  options={[
-                    "Fleet Manager",
-                    "Fleet Owner",
-                    "Finance Manager",
-                    "Support Agent",
-                  ]}
+            <KeyValues items={[["Current Role", role]]} />
+            <h3>Permissions</h3>
+            {access.map(([area, level]) => (
+              <label className="fp-check" key={area}>
+                <input
+                  type="checkbox"
+                  checked={level !== "No Access"}
+                  disabled
                 />
-              </Field>
-              <h3>Permissions</h3>
-              {[
-                "View dashboard and analytics",
-                "Manage drivers (add, edit, deactivate)",
-                "Manage vehicles (add, edit, deactivate)",
-                "View live operations and active work",
-                "View earnings and payouts",
-                "Manage team members",
-                "Manage settings",
-                "Access reports",
-              ].map((p, i) => (
-                <label className="fp-check" key={p}>
-                  <input type="checkbox" defaultChecked={![5, 6].includes(i)} />
-                  {p}
-                </label>
-              ))}
-              <Info>
-                Role changes affect this preview only; live permissions require
-                server enforcement.
-              </Info>
-            </DemoForm>
+                {area} · {level}
+              </label>
+            ))}
+            <Info>
+              Role changes are reviewed requests and must be enforced by the
+              backend. The last active owner cannot be removed or demoted.
+            </Info>
+            <Button href={`team/${record.id}/permissions`}>
+              Request role change
+            </Button>
           </Panel>
         </div>
-      )}
-      {edit && (
-        <Dialog title="Personal Information" onClose={() => setEdit(false)}>
-          <DemoForm onSave={() => setEdit(false)}>
-            <Field label="Full name" defaultValue="Aisha Bello" />
-            <Field label="Email address" defaultValue="aishasanga@gmail.com" />
-          </DemoForm>
-        </Dialog>
       )}
     </>
   );
 }
 
-export function IssueDetail() {
-  const [stage, setStage] = useState("Assigned to support");
-  const [cost, setCost] = useState("85000");
-  const [edit, setEdit] = useState(false);
-  const stages = [
-    "Issue reported by Driver",
-    "Assigned to support",
-    "Vehicle inspected",
-    "Vehicle Repaired",
-    "Maintenance complete",
-  ];
+// Designed timeline steps, one per maintenance state (F05 state model).
+const issueStages: [string, string][] = [
+  ["reported", "Issue reported by Driver"],
+  ["triaged", "Assigned to support"],
+  ["in_progress", "Vehicle inspected"],
+  ["resolution_submitted", "Vehicle Repaired"],
+  ["resolved", "Maintenance complete"],
+];
+
+/** F05-02 on the FLT 48 layout. Status moves only through the triage / update / resolve steps. */
+export function IssueDetail({ record }: { record: PreviewRecord }) {
+  const { state } = usePreview();
+  const vehicle = state.records.vehicles.find(
+    (v) => v.id === record.fields.vehicle,
+  );
+  const fixture = vehicle && fixtureVehicle(vehicle.name);
+  const reporter = state.records.drivers.find(
+    (d) => d.id === record.fields.reportedBy,
+  );
+  const person = reporter && fixturePerson(reporter.name);
+  const stage = issueStages.findIndex(
+    ([s]) => s === (record.status === "reopened" ? "triaged" : record.status),
+  );
+  const open = !["resolved", "cancelled_as_duplicate"].includes(record.status);
   return (
     <>
       <Header
@@ -757,40 +898,63 @@ export function IssueDetail() {
         description="View full details of this vehicle issue, including updates, resolution and related costs"
         back={{ label: "Back to Vehicle Issues", path: "maintenance" }}
       />
+      <PreviewBanner />
+      <div className="fp-work-links">
+        {[
+          ["Triage", "triage"],
+          ["Work order update", "update"],
+          ["Resolution review", "resolve"],
+        ].map(([label, key]) => (
+          <Link key={key} href={portalUrl(`maintenance/${record.id}/${key}`)}>
+            {label} →
+          </Link>
+        ))}
+      </div>
       <Panel>
         <div className="fp-three">
           <div>
-            <Badge>
-              {stage === "Maintenance complete" ? "Resolved" : "In progress"}
-            </Badge>
-            <h2>Engine Overheating</h2>
-            <p>ISS-2711</p>
-            <small>Reported on 30 Sep 2026 10:24 AM</small>
+            <Badge>{record.status}</Badge>
+            <h2>{record.name}</h2>
+            <p>{record.id.toUpperCase()}</p>
+            <small>Reported on 30 Oct 2026</small>
           </div>
-          <span className="fp-vehicle-cell">
-            <Asset
-              screen="922:15642"
-              name="imgFavpng885D290E782F4F3Ce6D77D44Cefe13C81"
-              width={150}
-              height={90}
-            />
-            <span>
-              Toyota Rav4<small>LND-204-BD</small>
+          {vehicle ? (
+            <span className="fp-vehicle-cell">
+              {fixture && (
+                <Asset
+                  screen="922:15642"
+                  name={fixture.image}
+                  width={150}
+                  height={90}
+                />
+              )}
+              <span>
+                {vehicle.name}
+                <small>{vehicle.fields.plate}</small>
+              </span>
             </span>
-          </span>
-          <Person large screen="922:15642" />
+          ) : (
+            <span />
+          )}
+          {person ? (
+            <Person large index={person.index} screen="922:15642" />
+          ) : (
+            <span />
+          )}
         </div>
         <div className="fp-issue-meta">
           <KeyValues
             items={[
-              ["Issue type", "Engine"],
-              ["Severity", "High"],
+              ["Issue type", record.fields.type ?? record.name],
+              ["Severity", statusLabel(record.fields.severity ?? "unrated")],
               [
                 "Vehicle availability",
-                stage === "Maintenance complete" ? "Available" : "Unavailable",
+                open && record.fields.severity === "critical"
+                  ? "Held from new assignments"
+                  : "Not held by this issue",
               ],
-              ["Reported by", "Chinedu Okafor"],
-              ["Target resolution", "2 Oct 2026"],
+              ["Reported by", reporter?.name ?? "—"],
+              ["Owner", record.fields.owner ?? "Unassigned"],
             ]}
           />
         </div>
@@ -799,76 +963,56 @@ export function IssueDetail() {
         <div className="fp-stack">
           <Panel title="Description">
             <p className="fp-muted">
-              Vehicle is overheating after 15–20 minutes of driving especially
-              in traffic. This has been noticed consistently for two weeks now.
+              {record.fields.description ?? "No description provided."}
             </p>
-            <div className="fp-photo-strip">
-              {[
-                "imgIgorConstantinoDczK3XiqdfsUnsplash1",
-                "imgToyota02FrontSeat1",
-                "imgToyota05Trunk1",
-              ].map((n) => (
-                <Asset
-                  screen="922:15642"
-                  name={n}
-                  width={64}
-                  height={64}
-                  key={n}
-                />
-              ))}
-            </div>
+            {record.id === "iss-2711" && (
+              <div className="fp-photo-strip">
+                {[
+                  "imgIgorConstantinoDczK3XiqdfsUnsplash1",
+                  "imgToyota02FrontSeat1",
+                  "imgToyota05Trunk1",
+                ].map((n) => (
+                  <Asset
+                    screen="922:15642"
+                    name={n}
+                    width={64}
+                    height={64}
+                    key={n}
+                  />
+                ))}
+              </div>
+            )}
           </Panel>
-          <Panel
-            title="Associated Cost"
-            action={<EditButton onClick={() => setEdit(true)} />}
-          >
+          <Panel title="Associated Cost">
             <p className="fp-big-blue">
-              ₦
-              {Number(cost).toLocaleString("en-NG", {
-                minimumFractionDigits: 2,
-              })}
+              {record.fields.cost
+                ? formatMoney(Number(record.fields.cost), record.market)
+                : "Not recorded"}
             </p>
+            <small className="fp-muted">
+              Costs are captured in a work order update.
+            </small>
           </Panel>
         </div>
-        <Panel
-          title="Timeline"
-          action={
-            <Dropdown
-              label="Update issue status"
-              value={stage}
-              onChange={setStage}
-              options={stages}
-            />
-          }
-        >
+        <Panel title="Timeline">
+          {record.status === "cancelled_as_duplicate" && (
+            <Info>Closed as a duplicate report.</Info>
+          )}
           <ol className="fp-timeline">
-            {stages.map((s, i) => (
-              <li
-                key={s}
-                className={i <= stages.indexOf(stage) ? "active" : ""}
-              >
+            {issueStages.map(([, label], i) => (
+              <li key={label} className={i <= stage ? "active" : ""}>
                 <span>{i + 1}</span>
-                <small>
-                  {i <= stages.indexOf(stage) ? `${i + 2}/4/26` : "----"}
-                </small>
-                <strong>{s}</strong>
+                <small>{i <= stage ? "Done" : "----"}</small>
+                <strong>{label}</strong>
               </li>
             ))}
           </ol>
+          <Info>
+            A resolved issue does not clear an independent document or
+            compliance hold.
+          </Info>
         </Panel>
       </div>
-      {edit && (
-        <Dialog title="Associated Cost" onClose={() => setEdit(false)}>
-          <DemoForm onSave={() => setEdit(false)}>
-            <Field
-              label="Amount (₦)"
-              type="number"
-              value={cost}
-              onChange={setCost}
-            />
-          </DemoForm>
-        </Dialog>
-      )}
     </>
   );
 }
@@ -878,7 +1022,7 @@ export function TripDetail() {
     <>
       <Header
         title="Trip TRP-99321"
-        description="Started 10:24 AM · 12 min to drop off"
+        description="Started 10:24 AM · Last location update 30 Oct 2026 09:00 UTC (sample)"
         back={{ label: "Back to Trips", path: "operations" }}
       />
       <div className="fp-two fp-trip-grid">
@@ -923,7 +1067,7 @@ export function TripDetail() {
           </Panel>
         </div>
         <div className="fp-stack">
-          <Panel title="Live Tracking">
+          <Panel title="Trip Map">
             <FleetMap trip />
             <h2>Trip Timeline</h2>
             <ol className="fp-timeline">
@@ -949,9 +1093,15 @@ export function TripDetail() {
               ))}
             </ol>
           </Panel>
+          {/* Rider personal data is privacy-restricted for fleet staff (F03). */}
           <Panel title="Passenger Information">
-            <Person name="Chinedu Okafor" />
-            <p className="fp-contact">08022024007 · 4.8 (27 trips)</p>
+            <p>
+              <strong>Sample rider</strong>
+            </p>
+            <p className="fp-contact">
+              Contact details hidden for rider privacy. Reach riders through
+              Sanga support.
+            </p>
           </Panel>
         </div>
       </div>

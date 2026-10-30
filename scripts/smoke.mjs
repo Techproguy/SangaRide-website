@@ -47,14 +47,26 @@ try {
       assert.equal(response.status, 200, `Route failed: ${route}`);
       const html = await response.text();
       assert(html.length > 500 && !html.includes("Application error: a server-side exception"), `Invalid page response: ${route}`);
+      if (route.startsWith("/fleet/portal")) {
+        for (const match of html.matchAll(/<a\b[^>]*\bhref="(\/fleet\/portal[^"?#]*)[^"]*"/g)) {
+          assert(routes.includes(match[1]), `Broken portal link on ${route}: ${match[1]}`);
+        }
+      }
       if (route === "/fleet") assert(html.includes("/fleet/portal/login"), "Fleet CTA must link to portal login");
       if (route === "/fleet/portal/login") assert(html.includes("Explore the fleet portal"), "Login must expose the explicit preview entry");
+      if (route === "/fleet/portal/settings/services") {
+        assert(html.includes("Service Types &amp; Eligibility"), "Service eligibility screen must replace fare editing");
+        assert(!html.includes("Base Price") && !html.includes("Price Type"), "Fleet service page must not expose pricing controls");
+      }
     }
     checked++;
   }
 
   const missing = await fetch(`${base}/fleet/portal/does-not-exist`, { signal: AbortSignal.timeout(15000) });
   assert.equal(missing.status, 404, "Unknown portal paths must return 404");
+  for (const route of ["/fleet/portal/drivers/not-a-driver", "/fleet/portal/vehicles/rav4/not-a-tab"]) {
+    assert.equal((await fetch(`${base}${route}`, { signal: AbortSignal.timeout(15000) })).status, 404, `Invalid record path must return 404: ${route}`);
+  }
   const assets = JSON.parse(await readFile(path.join(root, "src/lib/fleet-portal-assets.json"), "utf8"));
   const files = [...new Set(Object.values(assets).flatMap(Object.values))];
   for (const file of files) {

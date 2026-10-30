@@ -245,9 +245,17 @@
   font-size: 13px;
   padding: 14px 20px;
 }
-.fp .fp-dashboard-bottom td { padding: 12px 16px; font-size: 13px; }
-.fp .fp-dashboard-bottom th { padding: 14px 16px; font-size: 14px; }
-.fp .fp-dashboard-bottom .fp-table-panel > .fp-panel-heading { padding: 12px 22px; }
+.fp .fp-dashboard-bottom td {
+  padding: 12px 16px;
+  font-size: 13px;
+}
+.fp .fp-dashboard-bottom th {
+  padding: 14px 16px;
+  font-size: 14px;
+}
+.fp .fp-dashboard-bottom .fp-table-panel > .fp-panel-heading {
+  padding: 12px 22px;
+}
 .fp-chart-grid .fp-panel-heading .fp-select {
   min-height: 36px;
   padding: 6px 14px;
@@ -2958,5 +2966,287 @@
   }
   .fp-dialog {
     padding: 22px 18px;
+  }
+}
+.fp-preview-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #dce5f3;
+  background: #eef4ff;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  font-size: 12px;
+}
+.fp-preview-toolbar > span {
+  flex: 1 1 210px;
+}
+.fp-preview-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fp-preview-toolbar select {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 7px;
+  max-width: 155px;
+}
+.fp-preview-toolbar a,
+.fp-preview-toolbar button,
+.fp-link {
+  color: #1550f0;
+  font-weight: 600;
+}
+.fp-work-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+.fp-work-form {
+  margin-top: 24px;
+  max-width: 960px;
+}
+.fp-work-form h2 {
+  margin-bottom: 16px;
+}
+.fp-work-error {
+  color: #9f1239;
+  background: #fff1f2;
+  border-radius: 8px;
+  padding: 12px;
+  overflow-wrap: anywhere;
+}
+.fp-work-hub {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.fp-work-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+.fp-work-links a {
+  border: 1px solid #e0e7f1;
+  padding: 14px;
+  border-radius: 10px;
+  background: #fff;
+  color: #1550f0;
+  font-size: 14px;
+  font-weight: 500;
+}
+.fp-work-links a:hover {
+  background: #eef4ff;
+}
+.fp-record-grid {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+}
+.fp-record-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e1e7f0;
+  border-radius: 12px;
+  background: #fff;
+}
+.fp-record-card > div {
+  flex: 1 1 130px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fp-record-card small,
+.fp-record-id {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 400;
+  margin-top: 5px;
+}
+.fp-record-initial {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #eef4ff;
+  color: #1550f0;
+  font-weight: 600;
+}
+.fp-sample-files {
+  padding: 16px;
+  border: 1px dashed #b9c9e0;
+  border-radius: 10px;
+}
+.fp-sample-files p,
+.fp-sample-files small {
+  color: #526176;
+  font-size: 13px;
+}
+.fp-sample-files button:not(.fp-button) {
+  color: #1550f0;
+  margin-left: 8px;
+}
+.fp-work-timeline {
+  padding-left: 20px;
+  border-left: 2px solid #d9e5fc;
+  margin: 20px 0;
+}
+.fp-work-timeline li {
+  padding: 8px 0;
+  color: #526176;
+  font-size: 13px;
+}
+.fp-state-demo {
+  padding: 24px;
+  border: 1px solid #e0e7f1;
+  border-radius: 12px;
+  margin-top: 20px;
+}
+.fp-skeleton {
+  height: 24px;
+  width: 75%;
+  background: linear-gradient(90deg, #eef2f7, #dce5f3, #eef2f7);
+  border-radius: 8px;
+  margin: 12px 0;
+}
+.fp-record-mobile {
+  display: none;
+}
+.fp-work-form select,
+.fp-work-form textarea {
+  width: 100%;
+  min-height: 44px;
+}
+.fp-work-form input,
+.fp-work-form select,
+.fp-work-form textarea {
+  font-size: 16px;
+}
+.fp-record-card:focus-visible,
+.fp-work-links a:focus-visible {
+  outline: 2px solid #1550f0;
+  outline-offset: 3px;
+}
+@media (max-width: 767px) {
+  .fp-work-hub {
+    grid-template-columns: 1fr;
+  }
+  .fp-record-mobile {
+    display: block;
+  }
+  .fp-record-desktop {
+    display: none;
+  }
+  .fp-preview-toolbar {
+    padding: 12px;
+    gap: 10px;
+  }
+  .fp-preview-toolbar label {
+    flex: 1 1 130px;
+    flex-wrap: wrap;
+  }
+  .fp-preview-toolbar select {
+    width: 100%;
+    max-width: 100%;
+    font-size: 16px;
+  }
+  .fp-work-actions .fp-button {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+  }
+  .fp-work-form .fp-two {
+    grid-template-columns: 1fr;
+  }
+  .fp-login-content .fp-preview-toolbar {
+    margin-bottom: 20px;
+  }
+}
+
+/* Keep account controls in the toolbar's flow, including wrapped tablet rows. */
+.fp-preview-toolbar .fp-top-controls {
+  position: static;
+  margin: 0;
+  flex-shrink: 0;
+}
+.fp-main:has(.fp-chart-grid) > .fp-page-header {
+  padding-right: 0;
+}
+
+.fp-vehicle-preview {
+  display: grid;
+  grid-template-columns: minmax(180px, 258px) minmax(0, 1fr);
+  gap: 24px;
+  min-width: 0;
+}
+.fp-vehicle-preview > img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 258 / 135;
+  border-radius: 12px;
+}
+.fp-vehicle-preview-details {
+  min-width: 0;
+}
+.fp-vehicle-preview-details > strong {
+  display: block;
+  font-size: 22px;
+  line-height: 1.3;
+  letter-spacing: -0.5px;
+}
+.fp-vehicle-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.fp-vehicle-preview-meta > span {
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: #f1f5fa;
+  color: #526176;
+  font-size: 12px;
+  line-height: 1.4;
+}
+@media (max-width: 767px) {
+  .fp-vehicle-preview {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .fp-vehicle-preview > img {
+    max-height: 220px;
+  }
+  .fp-vehicle-preview-details > strong {
+    font-size: 20px;
+  }
+  .fp-vehicle-preview-meta {
+    margin-top: 10px;
+  }
+  .fp-record-card {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 8px 12px;
+    padding: 16px;
+  }
+  .fp-record-card > div > strong {
+    display: block;
+    line-height: 1.4;
+  }
+  .fp-record-card > .fp-badge {
+    grid-column: 2;
+    justify-self: start;
+    max-width: 100%;
+    white-space: normal;
   }
 }

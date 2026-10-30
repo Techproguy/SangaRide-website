@@ -2,7 +2,10 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { ChevronRight, Mail, Pencil, Trash2 } from "lucide-react";
-import { people, portalUrl } from "@/lib/fleet-portal";
+import { portalUrl } from "@/lib/fleet-portal";
+import { formatMoney, type PreviewRecord } from "@/lib/fleet-preview-domain";
+import { usePreview } from "./PreviewProvider";
+import { PreviewBanner } from "./WorkflowUI";
 import {
   Asset,
   Badge,
@@ -19,6 +22,7 @@ import {
   Panel,
   SearchField,
   Tabs,
+  statusLabel,
   useNotice,
 } from "./ui";
 
@@ -139,13 +143,18 @@ function SettingsOverview() {
   );
 }
 function Profile() {
-  const [logo, setLogo] = useState("");
+  const notice = useNotice();
   return (
     <>
       <Header
         title="Account & Profile"
         description="Manage your fleet account, information and security settings"
       />
+      <PreviewBanner />
+      <Info>
+        Legal name, registration and representative changes go through review
+        before they take effect.
+      </Info>
       <DemoForm>
         <div className="fp-two">
           <Panel title="Fleet Profile">
@@ -156,16 +165,17 @@ function Profile() {
                 width={100}
                 height={85}
               />
-              <label className="fp-text-link">
+              <button
+                type="button"
+                className="fp-text-link"
+                onClick={() =>
+                  notice(
+                    "Logo uploads are unavailable in this preview. No file is uploaded.",
+                  )
+                }
+              >
                 Change Logo
-                <input
-                  aria-label="Change fleet logo"
-                  type="file"
-                  accept="image/png,image/jpeg"
-                  onChange={(e) => setLogo(e.target.files?.[0]?.name ?? "")}
-                />
-              </label>
-              {logo && <small>{logo}</small>}
+              </button>
             </div>
             <Field
               label="Fleet Name"
@@ -198,12 +208,18 @@ function Profile() {
           </Panel>
           <Panel title="Fleet Profile">
             <Field label="Default Market" required>
-              <Dropdown label="Default Market" options={["Lagos", "Abuja"]} />
+              <Dropdown
+                label="Default Market"
+                options={["Nigeria", "United States"]}
+              />
             </Field>
             <Field label="Time zone" required>
               <Dropdown
                 label="Time zone"
-                options={["GMT +1 West Africa Time", "UTC"]}
+                options={[
+                  "Africa/Lagos (West Africa Time)",
+                  "America/New_York (Eastern Time)",
+                ]}
               />
             </Field>
             <Field label="Currency" required>
@@ -215,12 +231,16 @@ function Profile() {
             <div className="fp-two">
               <fieldset>
                 <legend>Default Service types</legend>
+                {/* Service eligibility is Sanga-controlled (LOCK-01, D-06). */}
                 {["Rides", "Delivery", "Airport rides"].map((t) => (
                   <label className="fp-check" key={t}>
-                    <input type="checkbox" defaultChecked />
+                    <input type="checkbox" defaultChecked disabled />
                     {t}
                   </label>
                 ))}
+                <Link className="fp-text-link" href={portalUrl("settings/services")}>
+                  Set by Sanga · view eligibility
+                </Link>
               </fieldset>
               <fieldset>
                 <legend>Distance unit</legend>
@@ -243,136 +263,63 @@ const serviceRows = [
     name: "Sanga Go",
     image: "imgPngwingCom22",
     desc: "Economical everyday ride",
-    price: 1200,
   },
   {
     name: "Comfort Ride",
     image: "imgFavpng885D290E782F4F3Ce6D77D44Cefe13C81",
     desc: "Comfortable reliable ride",
-    price: 1800,
   },
   {
     name: "Sanga XL",
     image: "imgFavpng111Cf00Afbe7Bc2Cdfda9E51953652261",
     desc: "Spacious rides for groups",
-    price: 3000,
   },
   {
     name: "Sanga Lux",
     image: "imgPngwingCom261",
     desc: "Luxurious rides for luxurious experience",
-    price: 5000,
   },
   {
     name: "Sanga Motor",
     image: "imgPngwingCom71",
     desc: "Beat traffic with motorcycle rides",
-    price: 700,
   },
   {
     name: "Sanga Assist",
     image: "imgPngwingCom271",
     desc: "Vehicle with extra help and accessibility",
-    price: 3000,
   },
 ];
 function Services() {
-  const [selected, setSelected] = useState("Sanga Go");
-  const [price, setPrice] = useState("1200");
-  const [active, setActive] = useState("Active");
-  const [saved, setSaved] = useState<
-    Record<string, { price: string; active: string }>
-  >({});
-  const current = serviceRows.find((s) => s.name === selected)!;
   return (
     <>
       <Header
-        title="Service Types"
-        description="Configure the service you operate and set their parameters, pricing and availability"
+        title="Service Types & Eligibility"
+        description="Sanga controls rider fares and service approval."
       />
-      <Panel title="Change Service Details">
-        <DemoForm
-          onSave={() =>
-            setSaved((s) => ({ ...s, [selected]: { price, active } }))
-          }
-        >
-          <div className="fp-three">
-            <div>
-              <Field label="Choose service type">
-                <Dropdown
-                  label="Choose service type"
-                  value={selected}
-                  onChange={(v) => {
-                    setSelected(v);
-                    setPrice(
-                      String(serviceRows.find((s) => s.name === v)!.price),
-                    );
-                  }}
-                  options={serviceRows.map((s) => s.name)}
-                />
-              </Field>
-              <span className="fp-vehicle-cell">
-                <Asset
-                  screen="922:21592"
-                  name={current.image}
-                  width={150}
-                  height={80}
-                />
-                <span>
-                  {current.name}
-                  <small>Standard ride</small>
-                </span>
-              </span>
-            </div>
-            <div>
-              <Field
-                label="Base Price (₦)"
-                type="number"
-                value={price}
-                onChange={setPrice}
-              />
-              <Field label="Status">
-                <Dropdown
-                  label="Service status"
-                  options={["Active", "Inactive"]}
-                  value={active}
-                  onChange={setActive}
-                />
-              </Field>
-            </div>
-            <div>
-              <Field label="Price Type">
-                <Dropdown
-                  label="Price Type"
-                  options={["Fixed price", "Estimated"]}
-                />
-              </Field>
-              <label className="fp-check">
-                <input type="checkbox" defaultChecked />
-                Show to customer in app
-              </label>
-            </div>
-          </div>
-        </DemoForm>
-      </Panel>
+      <Info>
+        Preview only · Pricing and commission configuration are Sanga-owned.
+        Service participation requests are unavailable until eligibility policy
+        is approved (D-06).
+      </Info>
       <DataTable
         paginate={false}
-        headers={["Service type", "Description", "Base Price", "Status"]}
-        rows={serviceRows.map((s, i) => ({
+        headers={[
+          "Service type",
+          "Description",
+          "Eligibility",
+          "Policy source",
+        ]}
+        rows={serviceRows.map((s) => ({
           key: s.name,
           cells: [
             <span key="v" className="fp-vehicle-cell">
               <Asset screen="922:21592" name={s.image} width={86} height={48} />
-              <span>
-                {s.name}
-                <small>{i > 3 ? "extra help" : "Standard ride"}</small>
-              </span>
+              <strong>{s.name}</strong>
             </span>,
             s.desc,
-            `₦${saved[s.name]?.price ?? s.price}`,
-            <Badge key="s">
-              {saved[s.name]?.active ?? (i < 4 ? "Active" : "Inactive")}
-            </Badge>,
+            <Badge key="status">Not connected</Badge>,
+            "Sanga market / zone policy",
           ],
         }))}
       />
@@ -413,6 +360,11 @@ function Policies() {
           Save Changes
         </Button>
       </Header>
+      <PreviewBanner />
+      <Info>
+        Fleet rules apply to your own operation. They cannot change Sanga
+        platform, pricing or safety policy.
+      </Info>
       <Panel title="Add Policy/rules">
         <form className="fp-inline-form" onSubmit={add}>
           <input
@@ -457,6 +409,27 @@ function Policies() {
 }
 function Billing() {
   const notice = useNotice();
+  const { state } = usePreview();
+  const count = (records: PreviewRecord[]) =>
+    records.filter((r) => r.market === state.market).length;
+  // Example monthly price in the market's currency (minor units); not an approved plan.
+  const price = formatMoney(
+    state.market === "NG" ? 5_000_000 : 9_900,
+    state.market,
+  );
+  // Monthly sample invoices counting back from September 2026.
+  const period = (i: number) => {
+    const start = new Date(Date.UTC(2026, 8 - i, 1));
+    const end = new Date(Date.UTC(2026, 9 - i, 0));
+    const fmt = (d: Date) =>
+      d.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+    return { range: `${fmt(start)} – ${fmt(end)}`, issued: fmt(end) };
+  };
   return (
     <>
       <Header
@@ -473,26 +446,32 @@ function Billing() {
           Change Plan
         </Button>
       </Header>
+      <PreviewBanner />
+      <Info>
+        Demo only (D-09). Fleet plans, prices and limits are not approved. No
+        subscription exists and nothing is charged.
+      </Info>
       <div className="fp-two">
-        <Panel title="Current Plan" action={<Badge>Active</Badge>}>
+        <Panel title="Current Plan" action={<Badge>Demo · not live</Badge>}>
           <p className="fp-big-blue">Growth</p>
           <p>
             Ideal for expanding fleets with advanced features and higher limits
           </p>
           <h3>
-            ₦50,000 <small>/month</small>
+            {price} <small>/month · example price</small>
           </h3>
-          <KeyValues items={[["Renewal date", "30 Oct 2026"]]} />
+          <KeyValues items={[["Renewal date", "No live subscription"]]} />
         </Panel>
         <Panel
           title="Plan Limits"
           action={<span className="fp-text-link">Usage</span>}
         >
           {[
-            ["Drivers", 50, 100],
-            ["Vehicles", 20, 100],
-            ["Team Members", 6, 20],
-            ["Active Integrations", 5, 10],
+            ["Drivers", count(state.records.drivers), 100],
+            ["Vehicles", count(state.records.vehicles), 100],
+            ["Team Members", count(state.records.team), 20],
+            // No integration is confirmed (D-10).
+            ["Active Integrations", 0, 10],
           ].map(([label, n, max]) => (
             <div className="fp-usage" key={label}>
               <span>{label}</span>
@@ -511,6 +490,7 @@ function Billing() {
         </Panel>
       </div>
       <DataTable
+        title="Sample invoices"
         headers={[
           "Invoice #",
           "Billing Period",
@@ -523,16 +503,16 @@ function Billing() {
           key: String(i),
           cells: [
             `INV-2026-${String(9 - i).padStart(3, "0")}`,
-            "1 Sep 2026 – 30 Sep 2026",
-            "₦50,000.00",
-            <Badge key="p">Paid</Badge>,
-            "30 Sep 2026",
+            period(i).range,
+            price,
+            <Badge key="p">Sample · not charged</Badge>,
+            period(i).issued,
             <ExportButton
               key="e"
               name="sample-invoice"
               rows={[
                 ["Sample invoice", "Amount"],
-                ["Growth plan", 50000],
+                ["Growth plan (example, not charged)", price],
               ]}
             />,
           ],
@@ -544,17 +524,21 @@ function Billing() {
 function Toggle({
   label,
   initial = true,
+  locked = false,
 }: {
   label: string;
   initial?: boolean;
+  /** Required notices (F07-N04) stay on and cannot be switched off. */
+  locked?: boolean;
 }) {
-  const [on, setOn] = useState(initial);
+  const [on, setOn] = useState(initial || locked);
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
-      aria-label={label}
+      aria-label={locked ? `${label} (required)` : label}
+      disabled={locked}
       className={`fp-toggle ${on ? "on" : ""}`}
       onClick={() => setOn(!on)}
     >
@@ -569,6 +553,7 @@ function NotificationSettings() {
         title="Notification Settings"
         description="Configure how and when you receive notifications and alerts"
       />
+      <PreviewBanner />
       <DemoForm>
         <Panel title="Notification Channels">
           <p className="fp-muted">
@@ -585,7 +570,7 @@ function NotificationSettings() {
                 <strong>{s}</strong>
                 <p className="fp-muted">
                   {i === 2
-                    ? "Get real time updates in the portal"
+                    ? "Get updates inside the portal"
                     : "Receive important updates via " + (i ? "SMS" : "email")}
                 </p>
                 <Toggle label={s} initial={i !== 1} />
@@ -596,7 +581,7 @@ function NotificationSettings() {
         <DataTable
           title="Notification Preferences"
           paginate={false}
-          headers={["Driver", "Email", "SMS", "In-App"]}
+          headers={["Notification", "Email", "SMS", "In-App"]}
           rows={[
             "Trip Updates",
             "Driver Activity",
@@ -630,11 +615,16 @@ function NotificationSettings() {
                   key={c}
                   label={`${s} ${c}`}
                   initial={n === 0 || ![0, 3, 5].includes(i)}
+                  locked={s === "Security Alerts" && c !== "SMS"}
                 />
               )),
             ],
           }))}
         />
+        <Info>
+          Security alerts by email and in-app are required and cannot be turned
+          off. Delivery depends on approved channels per market.
+        </Info>
       </DemoForm>
     </>
   );
@@ -806,19 +796,19 @@ const topics = [
   },
 ];
 function Support() {
+  const { state } = usePreview();
   const [search, setSearch] = useState("");
   const [article, setArticle] = useState<number | null>(null);
-  const [ticket, setTicket] = useState(false);
-  const [subject, setSubject] = useState("");
-  const [localTickets, setLocalTickets] = useState<string[]>([]);
+  const tickets = state.records.tickets.filter((t) => t.market === state.market);
   return (
     <>
       <Header
         title="Support Center"
         description="Find answers, raise a ticket, or contact our support team"
       >
-        <Button onClick={() => setTicket(true)}>+ New Support Ticket</Button>
+        <Button href="settings/support/new">+ New Support Ticket</Button>
       </Header>
+      <PreviewBanner />
       <SearchField
         placeholder="Search for help topics, guides or keywords"
         value={search}
@@ -873,35 +863,27 @@ function Support() {
           "Last Updated",
           "Action",
         ]}
-        rows={[
-          ...localTickets,
-          "Payout not received",
-          "Vehicle document rejected",
-          "Driver verification issue",
-          "Driver verification issue",
-          "Vehicle document rejected",
-        ].map((s, i) => ({
-          key: String(i),
+        rows={tickets.map((t) => ({
+          key: t.id,
           cells: [
-            `SR-${202612 + i}`,
-            s,
-            ["Payouts", "Vehicles", "Drivers"][i % 3],
-            <Badge key="s">
-              {i < localTickets.length
-                ? "Pending"
-                : ["Resolved", "Processing", "Overdue"][i % 3]}
-            </Badge>,
-            "30 Sep 2026, 11:02 AM",
+            t.id.toUpperCase(),
+            t.name,
+            t.fields.category ?? "General",
+            <Badge key="s">{t.status}</Badge>,
+            `Version ${t.version}`,
             <Link
               key="a"
               className="fp-text-link"
-              href={portalUrl("settings/support/sr-202612")}
+              href={portalUrl(`settings/support/${t.id}`)}
             >
               View details
             </Link>,
           ],
         }))}
       />
+      {!tickets.length && (
+        <p className="fp-muted">No support tickets in this market yet.</p>
+      )}
       {article !== null && (
         <Dialog title={topics[article].title} onClose={() => setArticle(null)}>
           <p>{topics[article].body}</p>
@@ -910,57 +892,28 @@ function Support() {
           </Button>
         </Dialog>
       )}
-      {ticket && (
-        <Dialog title="New Support Ticket" onClose={() => setTicket(false)}>
-          <DemoForm
-            button="Create preview ticket"
-            onSave={() => {
-              setLocalTickets((t) => [subject, ...t]);
-              setTicket(false);
-            }}
-          >
-            <Field
-              label="Subject"
-              required
-              value={subject}
-              onChange={setSubject}
-            />
-            <Dropdown
-              label="Ticket category"
-              options={["Payouts", "Vehicles", "Drivers", "Account"]}
-            />
-            <label className="fp-field">
-              Description
-              <textarea required />
-            </label>
-            <Info>Preview only. No support request is sent.</Info>
-          </DemoForm>
-        </Dialog>
-      )}
     </>
   );
 }
+/** F07-A01: only events recorded by this preview; no invented history (LOCK-06). */
 function Audit() {
+  const { state } = usePreview();
+  const notice = useNotice();
   const [search, setSearch] = useState("");
-  const [action, setAction] = useState("All Actions");
-  const [user, setUser] = useState("All Users");
   const [module, setModule] = useState("All Modules");
-  const rows = Array.from({ length: 12 }, (_, i) => ({
-    date: "30 Sep 2026",
-    user: people[i % 3].name,
-    module: ["Driver", "Fleet Operator", "Assignment"][i % 3],
-    detail: [
-      "Updated driver profile John Doe (DRV-7821)",
-      "Added new vehicle Toyota Corolla BDJ 822 FQ",
-      "Assigned driver to vehicle (DRV-6612 → KSF-21AAA)",
-    ][i % 3],
-    action: i === 1 ? "Created" : i === 3 ? "Deleted" : "Updated",
-  })).filter(
-    (r) =>
-      Object.values(r).join(" ").toLowerCase().includes(search.toLowerCase()) &&
-      (action === "All Actions" || action === r.action) &&
-      (user === "All Users" || user === r.user) &&
-      (module === "All Modules" || module === r.module),
+  const events = state.audit.filter((e) => e.market === state.market);
+  const modules = [
+    "All Modules",
+    ...new Set(events.map((e) => statusLabel(e.fields.collection ?? "other"))),
+  ];
+  const rows = events.filter(
+    (e) =>
+      [e.name, e.fields.reason, e.fields.actor]
+        .join(" ")
+        .toLowerCase()
+        .includes(search.toLowerCase()) &&
+      (module === "All Modules" ||
+        statusLabel(e.fields.collection ?? "other") === module),
   );
   return (
     <>
@@ -968,195 +921,240 @@ function Audit() {
         title="Audit Log"
         description="Track important actions and changes within your fleet portal"
       >
-        <ExportButton
-          rows={[
-            ["Date", "User", "Module", "Details", "Action"],
-            ...rows.map((r) => Object.values(r)),
-          ]}
-        />
+        <Button
+          secondary
+          onClick={() =>
+            notice(
+              "Audit export is unavailable in this preview (D-12). No file was created.",
+            )
+          }
+        >
+          Export
+        </Button>
       </Header>
+      <PreviewBanner />
+      <Info>
+        Local preview events only. This is not the production append-only audit
+        service.
+      </Info>
       <div className="fp-filters">
         <SearchField
           value={search}
           onChange={setSearch}
-          placeholder="Search by username, action or details"
-        />
-        <Dropdown
-          label="Audit action"
-          value={action}
-          onChange={setAction}
-          options={["All Actions", "Created", "Updated", "Deleted"]}
-        />
-        <Dropdown
-          label="Audit user"
-          value={user}
-          onChange={setUser}
-          options={["All Users", ...people.slice(0, 3).map((p) => p.name)]}
+          placeholder="Search by user, action or details"
         />
         <Dropdown
           label="Audit module"
           value={module}
           onChange={setModule}
-          options={["All Modules", "Driver", "Fleet Operator", "Assignment"]}
+          options={modules}
         />
       </div>
-      <DataTable
-        pageSize={10}
-        headers={[
-          "Date and Time",
-          "User",
-          "Module",
-          "Details",
-          "Action",
-          "IP Address",
-        ]}
-        rows={rows.map((r, i) => ({
-          key: String(i),
-          cells: [
-            <span key="d">
-              {r.date}
-              <small>14:22</small>
-            </span>,
-            r.user,
-            r.module,
-            r.detail,
-            <Badge key="a">{r.action}</Badge>,
-            "197.210.12.45",
-          ],
-        }))}
-      />
+      {events.length ? (
+        <DataTable
+          pageSize={10}
+          headers={[
+            "Event",
+            "User",
+            "Module",
+            "Details",
+            "Action",
+            "Correlation ID",
+          ]}
+          rows={rows.map((e) => ({
+            key: e.id,
+            cells: [
+              <Link
+                key="d"
+                className="fp-text-link"
+                href={portalUrl(`settings/audit/${e.id}`)}
+              >
+                {e.id}
+              </Link>,
+              e.fields.actor ?? "—",
+              statusLabel(e.fields.collection ?? "other"),
+              `${e.name} · ${e.fields.reason ?? ""}`,
+              <Badge key="a">{e.status}</Badge>,
+              e.fields.correlationId ?? "—",
+            ],
+          }))}
+        />
+      ) : (
+        <Panel title="No events yet">
+          <p className="fp-muted">
+            Actions taken in this preview, such as invitations, assignments and
+            requests, are recorded here.
+          </p>
+        </Panel>
+      )}
     </>
   );
 }
+const notificationCategory = (source = "") =>
+  source.startsWith("vehicles") || source.startsWith("maintenance")
+    ? "Vehicles"
+    : source.startsWith("drivers")
+      ? "Driver"
+      : source.startsWith("payouts") || source.startsWith("earnings")
+        ? "Earning"
+        : source.startsWith("settings/support")
+          ? "Support"
+          : "General";
+/** F07-N01 on the FLT 56 layout. Read state is managed on each notification's detail. */
 function Notifications() {
-  const [tab, setTab] = useState("All (24)");
+  const { state, execute } = usePreview();
+  const [tab, setTab] = useState("All");
   const [search, setSearch] = useState("");
-  const [read, setRead] = useState<number[]>([]);
-  const rows = Array.from({ length: 10 }, (_, i) => ({
-    id: i,
-    title:
-      i % 3 === 0
-        ? "Vehicle issue reported"
-        : i % 3 === 1
-          ? "Driver activity update"
-          : "Payout update",
-    category: i % 3 === 0 ? "Vehicles" : i % 3 === 1 ? "Driver" : "Earning",
-  }));
+  const [error, setError] = useState("");
+  const all = state.records.notifications.filter(
+    (n) => n.market === state.market,
+  );
+  const unread = all.filter((n) => n.status === "unread");
+  const tabs = [
+    `All (${all.length})`,
+    `Unread (${unread.length})`,
+    "Driver",
+    "Vehicles",
+    "Earning",
+    "Support",
+  ];
+  const active = tabs.find((t) => t.startsWith(tab)) ?? tabs[0];
+  const rows = all.filter(
+    (n) =>
+      n.name.toLowerCase().includes(search.toLowerCase()) &&
+      (tab === "All" ||
+        (tab === "Unread" && n.status === "unread") ||
+        notificationCategory(n.fields.source) === tab),
+  );
   return (
     <>
       <Header
         title="Notifications"
         description="Stay updated with important information"
       >
-        <ExportButton
-          rows={[["Notification"], ...rows.map((r) => [r.title])]}
-        />
+        <Button href="settings/notifications" secondary>
+          Preferences
+        </Button>
+        <Button
+          onClick={() => {
+            for (const n of unread) {
+              const result = execute({
+                kind: "transition",
+                collection: "notifications",
+                id: n.id,
+                version: n.version,
+                status: "read",
+                reason: "Bulk mark read preview",
+              });
+              if (!result.ok) setError(result.error);
+            }
+          }}
+        >
+          Mark all read
+        </Button>
       </Header>
+      <PreviewBanner />
       <SearchField
         value={search}
         onChange={setSearch}
-        placeholder="Search by username, action or details"
+        placeholder="Search notifications"
       />
       <Tabs
-        active={tab}
-        onChange={setTab}
-        items={[
-          "All (24)",
-          "Unread",
-          "Driver",
-          "Vehicles",
-          "Earning",
-          "Maintenance",
-        ].map((label) => ({ label }))}
+        active={active}
+        onChange={(label) => setTab(label.split(" (")[0])}
+        items={tabs.map((label) => ({ label }))}
       />
       <ul className="fp-notifications">
-        {rows
-          .filter(
-            (r) =>
-              r.title.toLowerCase().includes(search.toLowerCase()) &&
-              (tab.startsWith("All") ||
-                (tab === "Unread" && !read.includes(r.id)) ||
-                tab === r.category ||
-                (tab === "Maintenance" && r.category === "Vehicles")),
-          )
-          .map((r) => (
-            <li key={r.id} className={read.includes(r.id) ? "read" : ""}>
-              <Link
-                href={portalUrl(
-                  r.category === "Vehicles"
-                    ? "maintenance/iss-2711"
-                    : r.category === "Driver"
-                      ? "drivers/chinedu"
-                      : "payouts",
-                )}
-                onClick={() => setRead((a) => [...a, r.id])}
-              >
-                <span className="fp-setting-symbol">!</span>
-                <span>
-                  <strong>{r.title}</strong>
-                  <small>Chinedu Okafor · Sample fleet update</small>
-                </span>
-                <small>30 Sep 2026, 10:24 AM</small>
-                <ChevronRight size={17} />
-              </Link>
-            </li>
-          ))}
+        {rows.map((n) => (
+          <li key={n.id} className={n.status === "read" ? "read" : ""}>
+            <Link href={portalUrl(`notifications/${n.id}`)}>
+              <span className="fp-setting-symbol">!</span>
+              <span>
+                <strong>{n.name}</strong>
+                <small>
+                  {notificationCategory(n.fields.source)} · Queued for preview ·
+                  not sent
+                </small>
+              </span>
+              <small>{statusLabel(n.status)}</small>
+              <ChevronRight size={17} />
+            </Link>
+          </li>
+        ))}
       </ul>
+      {!rows.length && (
+        <p className="fp-muted">No notifications match this view.</p>
+      )}
+      {error && <p role="alert">{error}</p>}
     </>
   );
 }
-export function SupportTicket() {
+// Design conversation for the sample ticket; other tickets show their own stored message.
+const sampleThread = [
+  {
+    from: "You (Fleet Operator)",
+    text: "Hi, the payout for driver Ibrahim Sule (DRV-3456) for 23–29 September has not been received. Please assist.",
+    time: "11:42 AM",
+  },
+  {
+    from: "Sanga Support team",
+    text: "Hello, thanks for reaching out. We are checking the payout status and will get back to you.",
+    time: "11:45 AM",
+  },
+  {
+    from: "You (Fleet Operator)",
+    text: "Noted. Please confirm once this has been resolved.",
+    time: "11:47 AM",
+  },
+];
+/** F07-S04/S05 on the FLT 53/54 layout. Replies persist in the preview store; nothing is sent. */
+export function SupportTicket({ record }: { record: PreviewRecord }) {
+  const { execute } = usePreview();
   const [reply, setReply] = useState("");
-  const [replies, setReplies] = useState<string[]>([]);
-  const [attachment, setAttachment] = useState("");
   const [article, setArticle] = useState("");
+  const [error, setError] = useState("");
   const notice = useNotice();
+  const [original, ...replies] = (record.fields.message ?? "").split("\n");
+  const thread = [
+    ...(record.id === "sr-202612"
+      ? sampleThread
+      : [{ from: "You (Fleet Operator)", text: original, time: "Preview" }]),
+    ...replies.map((text) => ({
+      from: "You (Preview)",
+      text: text.replace(/^Preview reply: /, ""),
+      time: "Not sent",
+    })),
+  ];
+  const closed = record.status === "closed";
   return (
     <>
       <Header
         title=""
         back={{ label: "Back to Tickets", path: "settings/support" }}
       />
+      <PreviewBanner />
       <div className="fp-two fp-ticket-grid">
         <div className="fp-stack">
-          <Panel title="Ticket #SR 202612">
-            <p>Payout not received</p>
+          <Panel
+            title={`Ticket #${record.id.toUpperCase()}`}
+            action={<Badge>{record.status}</Badge>}
+          >
+            <p>{record.name}</p>
             <div className="fp-ticket-meta">
-              <small>Payouts</small>
+              <small>{record.fields.category ?? "General"}</small>
               <small>
                 Created
                 <br />
-                30 Sep 2026 11:42 AM
+                30 Oct 2026
               </small>
               <small>
-                Last updated
+                Version
                 <br />
-                30 Sep 2026 12:00 PM
+                {record.version}
               </small>
             </div>
           </Panel>
-          {[
-            {
-              from: "You (Fleet Operator)",
-              text: "Hi the payout for driver Ibrahim Sule (DRV-9910) for the period of 23–29 September has not been received, please assist",
-              time: "11:42 AM",
-            },
-            {
-              from: "Sanga Support team",
-              text: "Hello, thanks for reaching out, we are checking the payout status and we will get back to you shortly",
-              time: "11:45 AM",
-            },
-            {
-              from: "You (Fleet Operator)",
-              text: "Noted. Please confirm once this has been resolved",
-              time: "11:47 AM",
-            },
-            ...replies.map((text) => ({
-              from: "You (Preview)",
-              text,
-              time: "Draft preview",
-            })),
-          ].map((r, i) => (
+          {thread.map((r, i) => (
             <Panel key={i}>
               <div className="fp-message-heading">
                 <span className="fp-id">
@@ -1166,89 +1164,116 @@ export function SupportTicket() {
                 <small>{r.time}</small>
               </div>
               <p className="fp-muted">{r.text}</p>
-              {i === 0 && (
+              {i === 0 && record.id === "sr-202612" && (
                 <div className="fp-ticket-attachments">
-                  <button
-                    onClick={() =>
-                      notice(
-                        "No actual screenshot is attached to this sample ticket.",
-                      )
-                    }
-                  >
-                    Payout-screenshot.png<small>234kb</small>
-                  </button>
-                  <button
-                    onClick={() =>
-                      notice(
-                        "No actual statement is attached to this sample ticket.",
-                      )
-                    }
-                  >
-                    Statement.pdf<small>1.5mb</small>
-                  </button>
+                  {[
+                    ["Payout-screenshot.png", "234kb"],
+                    ["Statement.pdf", "1.5mb"],
+                  ].map(([name, size]) => (
+                    <button
+                      key={name}
+                      onClick={() =>
+                        notice(
+                          "Sample attachment only. No file is stored in this preview.",
+                        )
+                      }
+                    >
+                      {name}
+                      <small>{size}</small>
+                    </button>
+                  ))}
                 </div>
               )}
             </Panel>
           ))}
           <Panel>
-            <form
-              className="fp-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!reply.trim()) return;
-                setReplies((a) => [...a, reply]);
-                setReply("");
-                setAttachment("");
-                notice(
-                  "Reply added to this preview only. Nothing was sent to support.",
-                );
-              }}
-            >
-              <textarea
-                aria-label="Support reply"
-                placeholder="Type your message here"
-                required
-                value={reply}
-                onChange={(e) => setReply(e.target.value)}
-              />
-              <div className="fp-paired-buttons">
-                <label className="fp-button fp-secondary fp-attach">
-                  Attach File
-                  <input
-                    type="file"
-                    onChange={(e) =>
-                      setAttachment(e.target.files?.[0]?.name ?? "")
+            {closed ? (
+              <Info>This ticket is closed. Reopen it to reply.</Info>
+            ) : (
+              <form
+                className="fp-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!reply.trim()) return;
+                  const result = execute({
+                    kind: "transition",
+                    collection: "tickets",
+                    id: record.id,
+                    version: record.version,
+                    status: record.status,
+                    reason: "Ticket reply preview",
+                    fields: {
+                      message: `${record.fields.message ?? ""}\nPreview reply: ${reply.trim()}`,
+                    },
+                  });
+                  if (!result.ok) return setError(result.error);
+                  setError("");
+                  setReply("");
+                  notice(
+                    "Reply added to this preview only. Nothing was sent to support.",
+                  );
+                }}
+              >
+                <textarea
+                  aria-label="Support reply"
+                  placeholder="Type your message here"
+                  required
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                />
+                <div className="fp-paired-buttons">
+                  <Button
+                    secondary
+                    onClick={() =>
+                      notice(
+                        "Attachments are unavailable in this preview. No file is uploaded.",
+                      )
                     }
-                  />
-                </label>
-                <Button type="submit">Send reply</Button>
-              </div>
-              {attachment && <small>Selected locally: {attachment}</small>}
-            </form>
+                  >
+                    Attach File
+                  </Button>
+                  <Button type="submit">Send reply</Button>
+                </div>
+                {error && <p role="alert">{error}</p>}
+              </form>
+            )}
           </Panel>
         </div>
         <div className="fp-stack">
-          <Panel title="Ticket Information">
+          <Panel
+            title="Ticket Information"
+            action={
+              <Link
+                className="fp-text-link"
+                href={portalUrl(`settings/support/${record.id}/status`)}
+              >
+                Update status
+              </Link>
+            }
+          >
             <KeyValues
               items={[
-                ["Status", "Processing"],
-                ["Category", "Payouts"],
-                ["Priority", "High"],
-                ["Created", "30 Sep 2026 11:42"],
-                ["Last Updated", "30 Sep 2026 11:45"],
-                ["Created by", "Fleet Operator (Lagos move fleet)"],
+                ["Status", <Badge key="s">{record.status}</Badge>],
+                ["Category", record.fields.category ?? "General"],
+                ["Created", "30 Oct 2026"],
+                ["Created by", "Fleet Operator (Lagos Move Fleet)"],
+                ["Response time", "No commitment in preview"],
               ]}
             />
           </Panel>
           <Panel title="Related Information">
-            <KeyValues
-              items={[
-                ["Drivers", "Chioma Okafor (DRV-1621)"],
-                ["Payout Period", "23–29 Sep 2026"],
-                ["Reference", "PO-35621-1912-29102"],
-                ["Payout Method", "Bank Transfer (Wema Bank)"],
-              ]}
-            />
+            {record.id === "sr-202612" ? (
+              <KeyValues
+                items={[
+                  ["Driver", "Ibrahim Sule (DRV-3456)"],
+                  ["Payout Period", "23–29 Sep 2026"],
+                  ["Reference", "PO-35621-1912-29102"],
+                  ["Payout Method", "Bank transfer (•••• 6789)"],
+                ]}
+              />
+            ) : (
+              <p className="fp-muted">No related record linked.</p>
+            )}
           </Panel>
           <Panel title="Helpful Articles">
             {[

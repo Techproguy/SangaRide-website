@@ -3,7 +3,11 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { MoreVertical, Plus } from "lucide-react";
 import { people, vehicles, portalUrl } from "@/lib/fleet-portal";
+import { formatMoney, type Market } from "@/lib/fleet-preview-domain";
+import { usePreview } from "./PreviewProvider";
+import { PreviewBanner } from "./WorkflowUI";
 import {
+  statusLabel,
   Asset,
   Badge,
   Button,
@@ -403,6 +407,468 @@ export function Directory({ kind }: { kind: string }) {
           </form>
         </Dialog>
       )}
+    </>
+  );
+}
+
+// Preview records carry no photos or contact details; borrow them from the design fixtures by name.
+const normalize = (name: string) => name.toLowerCase().replace(/\s+/g, "");
+export function fixturePerson(name: string) {
+  const index = people.findIndex((p) => normalize(p.name) === normalize(name));
+  return index < 0 ? null : { index, ...people[index] };
+}
+export function fixtureVehicle(name: string) {
+  return vehicles.find((v) => normalize(v.name) === normalize(name)) ?? null;
+}
+const activeStatuses = ["eligible", "active"];
+const openIssue = (status: string) =>
+  !["resolved", "cancelled_as_duplicate"].includes(status);
+/** Illustrative earnings per completed trip, in minor units. */
+export const perTrip = { NG: 300_000, US: 2_500 } as const;
+/** Sample contact details and places per market; Nigeria keeps the design's local phone format. */
+export const samplePhone = (phone: string, market: Market) =>
+  market === "NG" ? phone : `+1 555 01${phone.slice(-2)}`;
+export const samplePlaces = {
+  NG: ["Ikeja City Mall", "Victoria Island", "Banana Island"],
+  US: ["Midtown Manhattan", "JFK Airport", "Brooklyn Heights"],
+} as const;
+
+/** F02-D01 on the Desktop - 4 layout, fed by the preview store for the selected market. */
+export function DriverDirectory() {
+  const { state } = usePreview();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("All statuses");
+  const drivers = state.records.drivers.filter((d) => d.market === state.market);
+  const assignments = state.records.assignments.filter(
+    (a) => a.status === "active",
+  );
+  const rows: TableRow[] = drivers.map((d) => {
+    const person = fixturePerson(d.name);
+    const vehicle = state.records.vehicles.find(
+      (v) => v.id === assignments.find((a) => a.fields.driver === d.id)?.fields.vehicle,
+    );
+    return {
+      key: d.id,
+      search: `${d.name} ${d.id} ${person ? samplePhone(person.phone, state.market) : ""} ${person?.id ?? ""}`,
+      status: statusLabel(d.status),
+      cells: [
+        person ? (
+          <Person key="p" index={person.index} />
+        ) : (
+          <strong key="p">{d.name}</strong>
+        ),
+        person ? samplePhone(person.phone, state.market) : "—",
+        vehicle ? (
+          <span key="v">
+            {vehicle.name}
+            <small>{vehicle.fields.plate}</small>
+          </span>
+        ) : (
+          "—"
+        ),
+        <Badge key="s">{d.status}</Badge>,
+        person?.trips ?? "—",
+        person ? formatMoney(person.trips * perTrip[state.market], state.market) : "—",
+        <RowActions key="a" path={`drivers/${d.id}`} label={d.name} />,
+      ],
+    };
+  });
+  const filtered = rows.filter(
+    (r) =>
+      (r.search ?? "").toLowerCase().includes(search.toLowerCase()) &&
+      (status === "All statuses" || r.status === status),
+  );
+  return (
+    <>
+      <Header
+        title="Drivers"
+        description="Manage all drivers in your fleet, view details, status and performance"
+      >
+        <Button href="drivers/invite">
+          <Plus size={16} />
+          Invite Driver
+        </Button>
+      </Header>
+      <PreviewBanner />
+      <Stats
+        items={[
+          { label: "Total Drivers", value: String(drivers.length), tone: "blue" },
+          {
+            label: "Active Drivers",
+            value: String(drivers.filter((d) => activeStatuses.includes(d.status)).length),
+            tone: "green",
+          },
+          {
+            label: "On trip",
+            value: String(drivers.filter((d) => d.fields.presence === "On trip").length),
+            tone: "orange",
+          },
+          {
+            label: "Offline",
+            value: String(drivers.filter((d) => d.fields.presence === "Offline").length),
+            tone: "red",
+          },
+        ]}
+      />
+      <div className="fp-filters">
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Search drivers by name, phone or ID"
+        />
+        <Dropdown
+          label="Filter status"
+          value={status}
+          onChange={setStatus}
+          options={["All statuses", ...new Set(rows.map((r) => r.status ?? ""))]}
+        />
+      </div>
+      <DataTable
+        headers={["Driver", "Phone", "Vehicle", "Status", "Trips(7d)", "Earnings", "Actions"]}
+        rows={filtered}
+      />
+    </>
+  );
+}
+
+/** F02-V01 on the Desktop - 12 layout, fed by the preview store for the selected market. */
+export function VehicleDirectory() {
+  const { state } = usePreview();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("All statuses");
+  const list = state.records.vehicles.filter((v) => v.market === state.market);
+  const inMaintenance = (id: string) =>
+    state.records.issues.some((i) => i.fields.vehicle === id && openIssue(i.status));
+  const driverFor = (id: string) =>
+    state.records.drivers.find(
+      (d) =>
+        d.id ===
+        state.records.assignments.find(
+          (a) => a.status === "active" && a.fields.vehicle === id,
+        )?.fields.driver,
+    );
+  const rows: TableRow[] = list.map((v) => {
+    const fixture = fixtureVehicle(v.name);
+    const driver = driverFor(v.id);
+    const person = driver && fixturePerson(driver.name);
+    return {
+      key: v.id,
+      search: `${v.name} ${v.fields.plate ?? ""} ${fixture?.type ?? ""} ${driver?.name ?? ""}`,
+      status: statusLabel(v.status),
+      cells: [
+        <span className="fp-vehicle-cell" key="v">
+          {fixture ? (
+            <Asset screen="922:19982" name={fixture.image} width={86} height={48} />
+          ) : null}
+          <span>
+            {v.name}
+            <small>{v.fields.service ?? "Service pending"}</small>
+          </span>
+        </span>,
+        v.fields.plate ?? "—",
+        fixture?.type ?? "—",
+        <Badge key="s">{v.status}</Badge>,
+        person ? (
+          <Person key="p" index={person.index} />
+        ) : (
+          driver?.name ?? "—"
+        ),
+        <Link
+          key="a"
+          href={portalUrl(`vehicles/${v.id}/overview`)}
+          className="fp-text-link"
+        >
+          See details
+        </Link>,
+      ],
+    };
+  });
+  const filtered = rows.filter(
+    (r) =>
+      (r.search ?? "").toLowerCase().includes(search.toLowerCase()) &&
+      (status === "All statuses" || r.status === status),
+  );
+  return (
+    <>
+      <Header
+        title="Vehicles"
+        description="Manage all vehicles in your fleet, view status, assignments, documents and maintenance"
+      >
+        <Button href="vehicles/new">
+          <Plus size={16} />
+          Add vehicle
+        </Button>
+      </Header>
+      <PreviewBanner />
+      <Stats
+        items={[
+          { label: "Total Vehicles", value: String(list.length), tone: "blue" },
+          {
+            label: "Active",
+            value: String(list.filter((v) => v.status === "active").length),
+            tone: "green",
+          },
+          {
+            label: "In maintenance",
+            value: String(list.filter((v) => inMaintenance(v.id)).length),
+            tone: "orange",
+          },
+          {
+            label: "Inactive",
+            value: String(list.filter((v) => !activeStatuses.includes(v.status)).length),
+            tone: "red",
+          },
+        ]}
+      />
+      <div className="fp-filters">
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by plate number, driver or model"
+        />
+        <Dropdown
+          label="Filter status"
+          value={status}
+          onChange={setStatus}
+          options={["All statuses", ...new Set(rows.map((r) => r.status ?? ""))]}
+        />
+      </div>
+      <DataTable
+        headers={["Vehicle", "Plate Number", "Type", "Status", "Assigned Driver", "Action"]}
+        rows={filtered}
+      />
+    </>
+  );
+}
+
+const inProgressIssue = ["triaged", "in_progress", "resolution_submitted"];
+
+/** F05-01 on the FLT 44 layout, fed by the preview store for the selected market. */
+export function IssueDirectory() {
+  const { state } = usePreview();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("All statuses");
+  const issues = state.records.issues.filter((i) => i.market === state.market);
+  const rows: TableRow[] = issues.map((issue) => {
+    const vehicle = state.records.vehicles.find(
+      (v) => v.id === issue.fields.vehicle,
+    );
+    const reporter = state.records.drivers.find(
+      (d) => d.id === issue.fields.reportedBy,
+    );
+    const person = reporter && fixturePerson(reporter.name);
+    return {
+      key: issue.id,
+      search: `${issue.name} ${issue.id} ${vehicle?.name ?? ""} ${reporter?.name ?? ""} ${issue.fields.severity ?? ""}`,
+      status: statusLabel(issue.status),
+      cells: [
+        person ? (
+          <Person key="p" index={person.index} />
+        ) : (
+          (reporter?.name ?? issue.fields.owner ?? "—")
+        ),
+        issue.id.toUpperCase(),
+        vehicle ? (
+          <span key="v">
+            {vehicle.name}
+            <small>{vehicle.fields.plate}</small>
+          </span>
+        ) : (
+          "—"
+        ),
+        issue.fields.type ?? issue.name,
+        "30 Oct 2026",
+        <Badge key="s">{issue.status}</Badge>,
+        <Link
+          key="a"
+          href={portalUrl(`maintenance/${issue.id}`)}
+          className="fp-text-link"
+        >
+          See details
+        </Link>,
+      ],
+    };
+  });
+  const filtered = rows.filter(
+    (r) =>
+      (r.search ?? "").toLowerCase().includes(search.toLowerCase()) &&
+      (status === "All statuses" || r.status === status),
+  );
+  return (
+    <>
+      <Header
+        title="Vehicle Issues"
+        description="Track and manage reported vehicle issues across your fleet"
+      >
+        <Button secondary href="maintenance/compliance">
+          Compliance overview
+        </Button>
+        <Button href="maintenance/new">
+          <Plus size={16} />
+          Report issue
+        </Button>
+      </Header>
+      <PreviewBanner />
+      <Stats
+        items={[
+          { label: "Total Issues", value: String(issues.length), tone: "blue" },
+          {
+            label: "In progress",
+            value: String(
+              issues.filter((i) => inProgressIssue.includes(i.status)).length,
+            ),
+            tone: "orange",
+          },
+          {
+            label: "Resolved",
+            value: String(issues.filter((i) => i.status === "resolved").length),
+            tone: "green",
+          },
+          {
+            label: "Open",
+            value: String(issues.filter((i) => openIssue(i.status)).length),
+            tone: "red",
+          },
+        ]}
+      />
+      <div className="fp-filters">
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by issue, vehicle or driver"
+        />
+        <Dropdown
+          label="Filter status"
+          value={status}
+          onChange={setStatus}
+          options={["All statuses", ...new Set(rows.map((r) => r.status ?? ""))]}
+        />
+      </div>
+      <DataTable
+        headers={[
+          "Driver",
+          "Issue ID",
+          "Vehicle",
+          "Issue type",
+          "Reported date",
+          "Status",
+          "Action",
+        ]}
+        rows={filtered}
+      />
+    </>
+  );
+}
+
+/** Display names for preview roles; the stored role is what permissions are checked against. */
+export const roleLabel: Record<string, string> = {
+  Owner: "Fleet Owner",
+  Operations: "Operations Manager",
+  "Read-only": "Read-only Analyst",
+};
+export const memberEmail = (name: string) =>
+  `${name.replace(/\s+/g, ".").toLowerCase()}@example.invalid`;
+
+/** F06-01 on the FLT 017 layout, fed by the preview store for the selected market. */
+export function TeamDirectory() {
+  const { state } = usePreview();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("All statuses");
+  const members = state.records.team.filter((m) => m.market === state.market);
+  const rows: TableRow[] = members.map((m) => {
+    const person = fixturePerson(m.name);
+    const role = roleLabel[m.fields.role] ?? m.fields.role ?? "—";
+    return {
+      key: m.id,
+      search: `${m.name} ${role} ${memberEmail(m.name)}`,
+      status: statusLabel(m.status),
+      cells: [
+        person ? (
+          <Person key="p" index={person.index} subtitle={role} />
+        ) : (
+          <strong key="p">{m.name}</strong>
+        ),
+        role,
+        memberEmail(m.name),
+        <Badge key="s">{m.status}</Badge>,
+        "Sample · today",
+        <Link
+          key="a"
+          href={portalUrl(`team/${m.id}`)}
+          className="fp-text-link"
+        >
+          See details
+        </Link>,
+      ],
+    };
+  });
+  const filtered = rows.filter(
+    (r) =>
+      (r.search ?? "").toLowerCase().includes(search.toLowerCase()) &&
+      (status === "All statuses" || r.status === status),
+  );
+  return (
+    <>
+      <Header
+        title="Team Members"
+        description="Manage team members, roles and permissions. Control who can access your fleet operations"
+      >
+        <Button href="team/invite">
+          <Plus size={16} />
+          Invite Team Member
+        </Button>
+      </Header>
+      <PreviewBanner />
+      <div className="fp-work-links">
+        {[
+          ["Invitation status", "team/invitations"],
+          ["Team activity", "team/activity"],
+          ["Transfer ownership", "team/ownership-transfer"],
+        ].map(([label, href]) => (
+          <Link key={href} href={portalUrl(href)}>
+            {label} →
+          </Link>
+        ))}
+      </div>
+      <Stats
+        items={[
+          { label: "All Members", value: String(members.length), tone: "blue" },
+          {
+            label: "Active",
+            value: String(members.filter((m) => m.status === "active").length),
+            tone: "green",
+          },
+          {
+            label: "Owners",
+            value: String(
+              members.filter((m) => m.fields.role === "Owner").length,
+            ),
+            tone: "orange",
+          },
+          {
+            label: "Inactive",
+            value: String(members.filter((m) => m.status !== "active").length),
+            tone: "red",
+          },
+        ]}
+      />
+      <div className="fp-filters">
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by name, role or email"
+        />
+        <Dropdown
+          label="Filter status"
+          value={status}
+          onChange={setStatus}
+          options={["All statuses", ...new Set(rows.map((r) => r.status ?? ""))]}
+        />
+      </div>
+      <DataTable
+        headers={["Name", "Role", "Email", "Status", "Last Active", "Action"]}
+        rows={filtered}
+      />
     </>
   );
 }

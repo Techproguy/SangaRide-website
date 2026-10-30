@@ -7,12 +7,13 @@ import {
   useContext,
   useId,
   useState,
+  useRef,
+  useLayoutEffect,
   type ReactNode,
   type FormEvent,
 } from "react";
 import {
   ArrowLeft,
-  ArrowUp,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -38,7 +39,10 @@ export function Asset({
   width?: number;
   height?: number;
 }) {
-  const src = assets[screen]?.[name];
+  // Assets are exported per Figma frame; reused images (avatars, cars) may only exist under another frame.
+  const src =
+    assets[screen]?.[name] ??
+    Object.values(assets).find((frame) => frame[name])?.[name];
   return src ? (
     <Image
       unoptimized
@@ -52,17 +56,30 @@ export function Asset({
 }
 export const DemoContext = createContext<(message: string) => void>(() => {});
 export const useNotice = () => useContext(DemoContext);
+/** Readable status text: preview records store raw enums such as "verification_pending". */
+export function statusLabel(status: string) {
+  const text = status.replace(/_/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 export function Badge({ children }: { children: ReactNode }) {
   const text = String(children).toLowerCase();
-  const tone = /cancel|fail|expire|inactive|overdue|deleted/.test(text)
-    ? "red"
-    : /pending|progress|maintenance|soon|processing/.test(text)
-      ? "orange"
-      : /trip|created|invited/.test(text)
-        ? "blue"
-        : /offline|completed assignment/.test(text)
-          ? "gray"
-          : "green";
+  if (typeof children === "string") children = statusLabel(children);
+  const tone =
+    /cancel|fail|expire|inactive|overdue|deleted|suspend|reject|revok|blocked/.test(
+      text,
+    )
+      ? "red"
+      : /pending|progress|maintenance|soon|processing/.test(text)
+        ? "orange"
+        : /trip|created|invited|unread/.test(text)
+          ? "blue"
+          : /offline|completed assignment/.test(text)
+            ? "gray"
+            : /^(active|eligible|approved|ready|resolved|read|effective|accepted|succeeded|successful|completed)$/.test(
+                  text,
+                )
+              ? "green"
+              : "gray";
   return <span className={`fp-badge fp-${tone}`}>{children}</span>;
 }
 export function Button({
@@ -115,7 +132,8 @@ export function Header({
       <div className="fp-header-row">
         <div>
           {eyebrow && <p className="fp-welcome">{eyebrow}</p>}
-          <h1>{title}</h1>
+          {/* Detail pages pass an empty title and render their own h1. */}
+          {title && <h1>{title}</h1>}
           {description && <p>{description}</p>}
         </div>
         {children && <div className="fp-header-actions">{children}</div>}
@@ -178,13 +196,7 @@ export function Stats({
             />
           </span>
           <span className="fp-muted">{s.label}</span>
-          <div className="fp-stat-number">
-            {s.value}
-            <span className="fp-change">
-              <ArrowUp size={11} />
-              12%
-            </span>
-          </div>
+          <div className="fp-stat-number">{s.value}</div>
           {s.hint && <small>{s.hint}</small>}
         </div>
       ))}
@@ -340,6 +352,7 @@ export function Field({
                 : undefined
           }
           required={required}
+          readOnly={value !== undefined && !onChange}
           placeholder={placeholder}
           {...(value === undefined ? { defaultValue } : { value })}
           onChange={(e) => onChange?.(e.target.value)}
@@ -539,13 +552,25 @@ export function Dialog({
   children: ReactNode;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    // Next's cached pages use Activity: their DOM may remain connected while
+    // effects are deactivated. A hidden modal must not keep the new page inert.
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, []);
   return (
     <dialog
       className="fp-dialog"
-      ref={(el) => {
-        if (el && !el.open) el.showModal();
+      ref={dialogRef}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
       }}
-      onCancel={onClose}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

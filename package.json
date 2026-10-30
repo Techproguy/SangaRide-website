@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:smoke": "node scripts/smoke.mjs"
+    "test:smoke": "node scripts/smoke.mjs",
+    "test:preview": "node --experimental-strip-types --test scripts/fleet-preview.test.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.61.0",

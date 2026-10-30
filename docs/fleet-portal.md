@@ -4,9 +4,9 @@ Source: [Sanga Ride Figma, fleet management web app](https://www.figma.com/desig
 
 The public Fleet hero, closing CTA, and route-specific header action use `fleetApplyPath`, now `/fleet/portal/login`. `/fleet/apply` redirects there for older links. The portal has its own navy sidebar, Work Sans typography, white panels, and mobile navigation; marketing navigation and the public footer are excluded.
 
-## Design coverage
+## Original design baseline
 
-The 41 supplied desktop frames are represented by 40 portal routes. The two support-ticket layout variants share the same conversation route. Additional local states (search results, forms, dialogs, mobile menu) use the same visual system. The source file supplies desktop layouts; mobile layouts adapt them with two-column statistic cards, stacked panels, and contained table scrolling.
+The original 41 full-page desktop frames were represented by 40 portal routes. The two support-ticket layout variants share the same conversation route. Additional local states (search results, forms, dialogs, mobile menu) use the same visual system. The source file supplies desktop layouts; mobile layouts adapt them with two-column statistic cards, stacked panels, and contained table scrolling.
 
 | Routes beneath `/fleet/portal` | Figma node(s) |
 | --- | --- |
@@ -38,15 +38,19 @@ The 41 supplied desktop frames are represented by 40 portal routes. The two supp
 - `src/lib/fleet-portal.ts`: route list and sample records.
 - `src/lib/fleet-portal-assets.json`: local asset aliases. Original SVGs are preserved; raster assets are optimized to WebP without cropping. No temporary Figma URLs are used at runtime.
 
+## F01–F08 workflow completion
+
+The portal now extends the original baseline with record-based routes, a shared layout-owned in-memory store, a visible reset control, market/role scenarios, and the F01–F08 workflow hub at `/fleet/portal/workflows`. See [screen coverage](fleet-coverage.md), [Figma inventory reconciliation](fleet-figma-inventory.md), and [QA boundaries](fleet-preview-qa.md). Fleet-editable fares have been removed. Financial changes are requests; sample allocation snapshots remain separate.
+
 ## Preview boundaries
 
 This is a frontend implementation, not a connected fleet service. The login form and Google/recovery actions explain that authentication is unavailable. An explicit preview link opens sample fleet data. No fake session, token, or authentication bypass is created.
 
-Search, status filters, pagination, tabs, map zoom/driver popups, editable rules, split calculations, notification switches, CSV downloads, and support-message drafts work locally. Changes reset when leaving their page. File controls select filenames locally and never upload documents. Invitations, banking verification, payouts, subscription changes, integrations, and support delivery do not call external services or claim successful live actions.
+Search, status filters, pagination, tabs, map zoom/driver popups, editable rules, split calculations, notification switches, CSV downloads, and support-message drafts work locally. New workflow records persist while navigating and reset on refresh or explicit reset; chart/view controls remain local. New attachment controls use built-in filenames and never accept real files. Invitations, banking verification, payouts, subscription changes, integrations, and support delivery do not call external services or claim successful live actions.
 
 Before production: connect real authentication and server authorization; tenant-scoped fleet APIs and storage; secure document handling; invitation delivery; provider-backed maps; banking/payout verification; permissions enforcement; and support/integration services. Replace all Figma sample records and dates with authorized live data.
 
-## Browser verification
+## Original browser verification (baseline)
 
 - Verified the Fleet CTA → portal login → explicit preview handoff.
 - Checked all 40 portal routes at a 390px viewport for rendering, page overflow, and broken loaded images. Retested the driver profile after fonts/layout settled.
@@ -55,4 +59,4 @@ Before production: connect real authentication and server authorization; tenant-
 - Verified driver search/status filtering, default split updates (30%/70%), adding a local rule, and adding a local support reply with truthful preview notices.
 - Compared desktop login/dashboard against the Figma reference at 1430px. Physical phones and live backend integrations have not been tested.
 
-Run `npm run lint`, `npm run build`, then `npm run test:smoke` from `web/` for validation. The smoke check starts and stops its own production server on a free localhost port, checks all built page routes, verifies the Fleet handoff/legacy redirect and an unknown-route HTTP 404, and checks every portal asset is local and non-empty.
+Run `npm run test:preview`, `npm run lint`, `npm run build`, then `npm run test:smoke` from `web/` for validation. The smoke check starts and stops its own production server on a free localhost port, checks all built page routes, verifies the Fleet handoff/legacy redirect and an unknown-route HTTP 404, and checks every portal asset is local and non-empty.

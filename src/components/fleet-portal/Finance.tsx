@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { people } from "@/lib/fleet-portal";
+import { people, portalUrl } from "@/lib/fleet-portal";
 import {
   Asset,
   Badge,
@@ -23,8 +23,17 @@ import {
   Tabs,
   useNotice,
 } from "./ui";
-import { RowActions } from "./Directory";
+import Link from "next/link";
+import { RowActions, fixturePerson, perTrip, samplePlaces } from "./Directory";
 import { Trend } from "./Overview";
+import {
+  allocation,
+  formatMoney,
+  marketConfig,
+} from "@/lib/fleet-preview-domain";
+import { AllocationBreakdown, FinanceLinks } from "./FinanceWorkflows";
+import { usePreview } from "./PreviewProvider";
+import { PreviewBanner } from "./WorkflowUI";
 
 export function Finance({ path }: { path: string }) {
   if (path === "payouts") return <Payouts />;
@@ -33,10 +42,37 @@ export function Finance({ path }: { path: string }) {
   if (path === "payouts/split") return <Split />;
   return <Settlement confirm={path.endsWith("confirm")} />;
 }
+/** Illustrative per-driver payout amounts, in minor units of each market's currency. */
+const samplePayout = {
+  NG: { paid: 18_640_000, pending: 9_040_000 },
+  US: { paid: 248_000, pending: 120_500 },
+} as const;
+const payoutStatus = (i: number) =>
+  i === 2 ? "Pending" : i === 5 ? "Failed" : "Successful";
 function Payouts() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All statuses");
   const notice = useNotice();
+  const { state } = usePreview();
+  const money = (n: number) => formatMoney(n, state.market);
+  const amounts = samplePayout[state.market];
+  const amount = (i: number) =>
+    payoutStatus(i) === "Pending" ? amounts.pending : amounts.paid;
+  // Seven sample payouts spread across the selected market's drivers.
+  const payees = state.records.drivers
+    .filter((d) => d.market === state.market)
+    .flatMap((d) => {
+      const person = fixturePerson(d.name);
+      return person ? [person] : [];
+    });
+  const payouts = payees.length
+    ? Array.from({ length: 7 }, (_, i) => ({ i, payee: payees[i % payees.length] }))
+    : [];
+  const total = (s?: string) =>
+    payouts.reduce(
+      (sum, { i }) => (!s || payoutStatus(i) === s ? sum + amount(i) : sum),
+      0,
+    );
   return (
     <>
       <Header
@@ -53,6 +89,7 @@ function Payouts() {
           + Initiate driver’s Payout
         </Button>
       </Header>
+      <PreviewBanner />
       <div className="fp-filters">
         <SearchField value={search} onChange={setSearch} />
         <Dropdown
@@ -72,10 +109,14 @@ function Payouts() {
       </div>
       <Stats
         items={[
-          { label: "Total Payouts", value: "₦3,425,600", tone: "green" },
-          { label: "Successful", value: "₦3,200,600", tone: "green" },
-          { label: "Pending", value: "₦90,400", tone: "orange" },
-          { label: "Failed", value: "₦10,000", tone: "red" },
+          { label: "Total Payouts", value: money(total()), tone: "green" },
+          {
+            label: "Successful",
+            value: money(total("Successful")),
+            tone: "green",
+          },
+          { label: "Pending", value: money(total("Pending")), tone: "orange" },
+          { label: "Failed", value: money(total("Failed")), tone: "red" },
         ]}
       />
       <DataTable
@@ -89,21 +130,23 @@ function Payouts() {
           "Action",
         ]}
         pageSize={10}
-        rows={people
-          .map((p, i) => ({
-            key: p.id,
-            status: i === 2 ? "Pending" : i === 5 ? "Failed" : "Successful",
-            search: p.name,
+        rows={payouts
+          .map(({ i, payee }) => ({
+            key: String(i),
+            status: payoutStatus(i),
+            search: payee.name,
             cells: [
-              <Person key="p" index={i} />,
-              ["PAY-7821", "PAY-9866", "PAY-5467"][i % 3],
-              i === 2 ? "₦90,400" : "₦186,400",
-              "1–12 Jan 2027",
-              "14 Jan 2027",
-              <Badge key="s">
-                {i === 2 ? "Pending" : i === 5 ? "Failed" : "Successful"}
-              </Badge>,
-              <RowActions key="a" label={p.name} path="payouts/destination" />,
+              <Person key="p" index={payee.index} />,
+              `PAY-${7821 + i * 211}`,
+              money(amount(i)),
+              `${1 + i}–${12 + i} Oct 2026`,
+              payoutStatus(i) === "Successful" ? `${14 + i} Oct 2026` : "—",
+              <Badge key="s">{payoutStatus(i)}</Badge>,
+              <RowActions
+                key="a"
+                label={payee.name}
+                path="payouts/destination"
+              />,
             ],
           }))
           .filter(
@@ -112,11 +155,17 @@ function Payouts() {
               (status === "All statuses" || status === r.status),
           )}
       />
+      <AllocationBreakdown />
+      <FinanceLinks />
     </>
   );
 }
 function Destination() {
   const notice = useNotice();
+  const { state } = usePreview();
+  const amounts = samplePayout[state.market];
+  // Masked per spec F04-05; no real bank account is connected in the preview.
+  const bank = state.market === "NG" ? "Wema Bank" : "Sample US bank";
   return (
     <>
       <Header
@@ -129,21 +178,22 @@ function Destination() {
       </Header>
       <Panel
         title="Current Payout Destination"
-        action={<Badge>Verified</Badge>}
+        action={<Badge>Sample · not connected</Badge>}
       >
         <div className="fp-bank-details">
           <div className="fp-bank-icon">▥</div>
           <strong>
-            Wema Bank<small>Business Account</small>
+            {bank}
+            <small>Business Account · {marketConfig[state.market].currency}</small>
           </strong>
           <div>
             <small>Account Name</small>Lagos Move Fleet Ltd
           </div>
           <div>
-            <small>Account Number</small>0123456789
+            <small>Account Number</small>•••• 6789
           </div>
           <div>
-            <small>Last Verified</small>12 Sep 2026
+            <small>Last Verified</small>Not verified
           </div>
         </div>
       </Panel>
@@ -169,7 +219,7 @@ function Destination() {
         </form>
       </Panel>
       <DataTable
-        title="Request Payout"
+        title="Recent payouts"
         paginate={false}
         headers={[
           "Date",
@@ -184,8 +234,8 @@ function Destination() {
           cells: [
             `${29 - i} Sep 2026`,
             "PAYOUT-70568890-821",
-            i === 2 ? "₦90,400" : "₦186,400",
-            "Wema Bank (0121)",
+            formatMoney(i === 2 ? amounts.pending : amounts.paid, state.market),
+            `${bank} (•••• 6789)`,
             <Badge key="s">{s}</Badge>,
             <RowActions key="a" label={`Payout ${i + 1}`} path="payouts" />,
           ],
@@ -626,11 +676,25 @@ export function Reports({ path }: { path: string }) {
   const [group, setGroup] = useState("Daily");
   const [tab, setTab] = useState("Earning by day");
   const [search, setSearch] = useState("");
-  const [generated, setGenerated] = useState(false);
+  const [from, setFrom] = useState("2026-10-01");
   const notice = useNotice();
+  const { state, execute } = usePreview();
+  const money = (n: number) => formatMoney(n, state.market);
+  const currency = marketConfig[state.market].currency;
+  const drivers = state.records.drivers
+    .filter((d) => d.market === state.market)
+    .map((d) => ({ record: d, person: fixturePerson(d.name) }))
+    .flatMap(({ record, person }) => (person ? [{ record, person }] : []));
+  const vehicleNames = state.records.vehicles
+    .filter((v) => v.market === state.market)
+    .map((v) => v.name);
   const exportRows = [
-    ["Driver", "Trips", "Earnings"],
-    ...people.map((p) => [p.name, p.trips, 142500]),
+    ["Driver", "Trips", `Earnings (${currency} minor units)`],
+    ...drivers.map(({ person }) => [
+      person.name,
+      person.trips,
+      person.trips * perTrip[state.market],
+    ]),
   ];
   if (path === "reports")
     return (
@@ -639,6 +703,19 @@ export function Reports({ path }: { path: string }) {
           title="Generate Report"
           description="Create and export detailed reports about your fleet operations and payouts"
         />
+        <PreviewBanner />
+        <div className="fp-work-links">
+          {[
+            ["Trip report", "reports/trips"],
+            ["Vehicle report", "reports/vehicles"],
+            ["Payout / reconciliation", "reports/reconciliation"],
+            ["Download history", "reports/history"],
+          ].map(([label, href]) => (
+            <Link key={href} href={portalUrl(href)}>
+              {label} →
+            </Link>
+          ))}
+        </div>
         <div className="fp-report-types">
           {[
             "Earning report",
@@ -671,7 +748,12 @@ export function Reports({ path }: { path: string }) {
         </div>
         <Panel>
           <div className="fp-three">
-            <Field label="Date Range" type="date" defaultValue="2026-09-01" />
+            <Field
+              label="Date Range"
+              type="date"
+              value={from}
+              onChange={setFrom}
+            />
             <Field label="Group by">
               <Dropdown
                 label="Report grouping"
@@ -688,11 +770,14 @@ export function Reports({ path }: { path: string }) {
           <div className="fp-filters">
             <Dropdown
               label="Report drivers"
-              options={["All drivers", ...people.map((p) => p.name)]}
+              options={[
+                "All drivers",
+                ...drivers.map(({ record }) => record.name),
+              ]}
             />
             <Dropdown
               label="Report vehicles"
-              options={["All Vehicles", "Toyota Rav4", "Toyota Corolla"]}
+              options={["All Vehicles", ...vehicleNames]}
             />
             <Dropdown
               label="Trip types"
@@ -706,8 +791,24 @@ export function Reports({ path }: { path: string }) {
           <div className="fp-form-actions">
             <Button
               onClick={() => {
-                setGenerated(true);
-                notice(`${type} generated from sample data only.`);
+                // Report jobs are asynchronous (F07-R08): a new job starts queued, never ready.
+                const result = execute({
+                  kind: "create",
+                  collection: "reports",
+                  name: type,
+                  fields: {
+                    type: type.toLowerCase(),
+                    currency,
+                    from,
+                    to: "2026-10-30",
+                    group,
+                  },
+                });
+                notice(
+                  result.ok
+                    ? `${type} queued in this preview. Open the job to follow its status.`
+                    : result.error,
+                );
               }}
             >
               <Download size={16} />
@@ -723,37 +824,58 @@ export function Reports({ path }: { path: string }) {
             "Data range",
             "Format",
             "Status",
-            "Requested at",
+            "Currency",
             "Download",
           ]}
-          rows={[
-            ...(generated ? [type] : []),
-            "Earning report",
-            "Trip report",
-            "Driver report",
-            "Trip report",
-          ].map((t, i) => ({
-            key: `${t}-${i}`,
-            cells: [
-              t,
-              "1–30 Sep 2026",
-              "CSV",
-              <Badge key="s">
-                {generated && i === 0
-                  ? "Ready"
-                  : ["Ready", "Processing", "Failed", "Processing"][i % 4]}
-              </Badge>,
-              "30 Sep 2026, 11:02 AM",
-              <ExportButton
-                key="d"
-                rows={exportRows}
-                name="sanga-sample-report"
-              />,
-            ],
-          }))}
+          rows={state.records.reports
+            .filter((r) => r.market === state.market)
+            .map((r) => ({
+              key: r.id,
+              cells: [
+                r.name,
+                `${r.fields.from ?? "—"} – ${r.fields.to ?? "—"}`,
+                "CSV",
+                <Badge key="s">{r.status}</Badge>,
+                r.fields.currency ?? currency,
+                r.status === "ready" ? (
+                  <ExportButton
+                    key="d"
+                    rows={exportRows}
+                    name="sanga-sample-report"
+                  />
+                ) : (
+                  <Link
+                    key="d"
+                    className="fp-text-link"
+                    href={portalUrl(`reports/jobs/${r.id}`)}
+                  >
+                    View job
+                  </Link>
+                ),
+              ],
+            }))}
         />
       </>
     );
+  // Illustrative, internally consistent figures: Sanga's fee comes off each row first (LOCK-02).
+  const dailyRows = people.map((_, i) => {
+    const trips = 52 - i;
+    return { trips, split: allocation(trips * perTrip[state.market], 1500, 2000) };
+  });
+  const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
+  // Totals are the sum of the rows so the report reconciles exactly.
+  const total = {
+    gross: sum(dailyRows.map((r) => r.split.gross)),
+    sanga: sum(dailyRows.map((r) => r.split.sanga)),
+    fleet: sum(dailyRows.map((r) => r.split.fleet)),
+    driver: sum(dailyRows.map((r) => r.split.driver)),
+  };
+  const performance = drivers.map(({ record, person }) => ({
+    record,
+    person,
+    trips: person.trips,
+    completed: Math.round(person.trips * 0.95),
+  }));
   return (
     <>
       <Header
@@ -770,24 +892,31 @@ export function Reports({ path }: { path: string }) {
       >
         <ExportButton rows={exportRows} />
       </Header>
+      <PreviewBanner />
       <Stats
         items={(path.endsWith("performance")
           ? [
-              ["Active drivers", "48"],
-              ["Total Trips", "1842"],
-              ["Completed Trips", "1,712"],
-              ["Cancelled Trips", "130"],
+              ["Drivers", String(performance.length)],
+              ["Total Trips", String(sum(performance.map((p) => p.trips)))],
+              [
+                "Completed Trips",
+                String(sum(performance.map((p) => p.completed))),
+              ],
+              [
+                "Cancelled Trips",
+                String(sum(performance.map((p) => p.trips - p.completed))),
+              ],
             ]
           : [
-              ["Total Earnings", "₦3,425,600"],
-              ["Fleet Commission", "₦342,560"],
-              ["Driver Payout", "₦2,980,400"],
-              ["Completed Trips", "1842"],
+              ["Total Earnings", money(total.gross)],
+              ["Fleet Commission", money(total.fleet)],
+              ["Driver Payout", money(total.driver)],
+              ["Sanga fee (first)", money(total.sanga)],
             ]
         ).map(([label, value]) => ({
           label,
           value,
-          hint: "vs previous month",
+          hint: "Sample period",
         }))}
       />
       {path.endsWith("performance") ? (
@@ -805,20 +934,20 @@ export function Reports({ path }: { path: string }) {
               "Rating",
               "Status",
             ]}
-            rows={people
+            rows={performance
               .filter((p) =>
-                p.name.toLowerCase().includes(search.toLowerCase()),
+                p.person.name.toLowerCase().includes(search.toLowerCase()),
               )
-              .map((p, i) => ({
-                key: p.id,
+              .map((p) => ({
+                key: p.record.id,
                 cells: [
-                  <Person key="p" index={i} />,
-                  "245",
-                  "238",
-                  "98%",
-                  "₦486,200",
+                  <Person key="p" index={p.person.index} />,
+                  String(p.trips),
+                  String(p.completed),
+                  `${Math.round((p.completed / p.trips) * 100)}%`,
+                  money(p.trips * perTrip[state.market]),
                   "4.8 ★",
-                  <Badge key="s">{p.status}</Badge>,
+                  <Badge key="s">{p.record.status}</Badge>,
                 ],
               }))}
           />
@@ -843,29 +972,29 @@ export function Reports({ path }: { path: string }) {
               tab === "Earning by day" ? "Date" : tab.replace("By ", ""),
               "Trips",
               "Gross earning",
-              "Commission",
+              "Sanga fee",
               "Driver payout",
               "Adjustment",
-              "Net earning",
+              "Fleet net",
             ]}
-            rows={people.map((p, i) => ({
-              key: p.id,
+            rows={dailyRows.map((row, i) => ({
+              key: String(i),
               cells: [
                 tab === "By driver"
-                  ? p.name
+                  ? (drivers[i % drivers.length]?.record.name ?? "—")
                   : tab === "By Vehicle"
-                    ? "Toyota Rav4"
+                    ? (vehicleNames[i % vehicleNames.length] ?? "—")
                     : tab === "By location"
-                      ? "Ikeja"
+                      ? samplePlaces[state.market][i % 3]
                       : tab === "By service type"
                         ? "Standard Ride"
-                        : `${i + 1} Sep 2026`,
-                52 - i,
-                "₦98,000",
-                "₦9,840",
-                "₦86,000",
-                "₦0",
-                "₦86,000",
+                        : `${i + 1} Oct 2026`,
+                row.trips,
+                money(row.split.gross),
+                money(row.split.sanga),
+                money(row.split.driver),
+                money(0),
+                money(row.split.fleet),
               ],
             }))}
           />
