@@ -10,6 +10,7 @@ import {
   marketConfig,
 } from "@/lib/fleet-preview-domain";
 import { AllocationBreakdown, FinanceLinks } from "./FinanceWorkflows";
+import { fixturePerson, perTrip } from "./Directory";
 import { PreviewBanner } from "./WorkflowUI";
 import {
   Asset,
@@ -138,20 +139,37 @@ export function Trend({
     </Panel>
   );
 }
-/** Illustrative gross fares for the selected period, in minor units of each market's currency. */
-export const sampleGross = { NG: 342_560_000, US: 4_862_000 } as const;
 const serviceShares = [
   ["Standard Ride", 5660],
   ["Airport Ride", 2000],
   ["Deliveries", 1200],
   ["Scheduled Rides", 1140],
 ] as const;
-const tripCounts = [
-  ["Completed", 1520],
-  ["In progress", 180],
-  ["Cancelled", 92],
-  ["No show", 50],
-] as const;
+/**
+ * Sample trips for the selected market, derived from its drivers so the dashboard, earnings
+ * and driver pages agree. Gross fares are completed trips at the illustrative per-trip rate.
+ */
+export function useSampleTrips() {
+  const { state } = usePreview();
+  const total = state.records.drivers
+    .filter((d) => d.market === state.market)
+    .reduce((sum, d) => sum + (fixturePerson(d.name)?.trips ?? 0), 0);
+  const inProgress = Math.round(total * 0.1);
+  const cancelled = Math.round(total * 0.05);
+  const noShow = Math.round(total * 0.03);
+  const completed = total - inProgress - cancelled - noShow;
+  return {
+    total,
+    completed,
+    gross: completed * perTrip[state.market],
+    counts: [
+      ["Completed", completed],
+      ["In progress", inProgress],
+      ["Cancelled", cancelled],
+      ["No show", noShow],
+    ] as [string, number][],
+  };
+}
 /** Whole percentages that always total 100 (largest remainder). */
 function percentages(values: number[]) {
   const total = values.reduce((a, b) => a + b, 0);
@@ -166,7 +184,8 @@ function percentages(values: number[]) {
 }
 export function Breakdown({ earnings = false }: { earnings?: boolean }) {
   const { state } = usePreview();
-  const gross = sampleGross[state.market];
+  const trips = useSampleTrips();
+  const gross = trips.gross;
   // Whole currency units; the last share takes the remainder so the parts sum to the total.
   const amounts = serviceShares.map(
     ([, bps]) => Math.round((gross * bps) / 1_000_000) * 100,
@@ -175,9 +194,9 @@ export function Breakdown({ earnings = false }: { earnings?: boolean }) {
     gross - amounts.slice(0, -1).reduce((a, b) => a + b, 0);
   const rows: [string, string][] = earnings
     ? serviceShares.map(([name], i) => [name, formatMoney(amounts[i], state.market)])
-    : tripCounts.map(([name, n]) => [name, n.toLocaleString("en-US")]);
+    : trips.counts.map(([name, n]) => [name, n.toLocaleString("en-US")]);
   const shares = percentages(
-    earnings ? amounts : tripCounts.map(([, n]) => n),
+    earnings ? amounts : trips.counts.map(([, n]) => n),
   );
   return (
     <Panel title={earnings ? "Earnings Breakdown" : "Trip Status"}>
@@ -222,7 +241,7 @@ export function Breakdown({ earnings = false }: { earnings?: boolean }) {
                       notation: "compact",
                     },
                   ).format(gross / 100)
-                : "1,842"}
+                : trips.total.toLocaleString("en-US")}
             </strong>
             <small>{earnings ? "Total Earnings" : "Total trips"}</small>
           </span>
@@ -249,7 +268,7 @@ export function Breakdown({ earnings = false }: { earnings?: boolean }) {
 export function RecentTrips({ full = false }: { full?: boolean }) {
   return (
     <DataTable
-      title={full ? "Active Trips (42)" : "Earnings Trend"}
+      title={full ? "Active Trips (42)" : "Recent Trips"}
       action={
         <Link href={portalUrl("operations")} className="fp-text-link">
           View all
@@ -606,7 +625,8 @@ export function Earnings() {
   const { state } = usePreview();
   const money = (n: number) => formatMoney(n, state.market);
   // Same illustrative rates as the breakdown panel: Sanga's fee comes off first (LOCK-02).
-  const split = allocation(sampleGross[state.market], 1500, 2000);
+  const trips = useSampleTrips();
+  const split = allocation(trips.gross, 1500, 2000);
   return (
     <>
       <Header
@@ -635,7 +655,7 @@ export function Earnings() {
           },
           {
             label: "Completed Trips",
-            value: "1,520",
+            value: trips.completed.toLocaleString("en-US"),
             hint: "Sample period",
           },
         ]}

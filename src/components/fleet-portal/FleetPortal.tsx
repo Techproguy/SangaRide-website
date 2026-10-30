@@ -26,8 +26,8 @@ import {
   OperationsUnavailable,
 } from "./Overview";
 import {
-  Directory,
   DriverDirectory,
+  InvitationDirectory,
   InviteDriver,
   IssueDirectory,
   TeamDirectory,
@@ -61,7 +61,7 @@ const designedVehicleTabs = [
  * steps (review, verification, manage, split) and records without design data fall through.
  */
 function designedScreen(path: string, state: PreviewState): ReactNode {
-  if (["earnings", "payouts", "payouts/destination"].includes(path))
+  if (designedFinance.includes(path))
     // Operations staff get the workflow layer's permission-denied view.
     return state.role === "Operations" ? null : path === "earnings" ? (
       <Earnings />
@@ -69,6 +69,8 @@ function designedScreen(path: string, state: PreviewState): ReactNode {
       <Finance key={path} path={path} />
     );
   if (path === "drivers") return <DriverDirectory />;
+  if (path === "drivers/invite") return <InviteDriver />;
+  if (path === "invitations") return <InvitationDirectory />;
   if (path === "vehicles") return <VehicleDirectory />;
   const [section, id, tab, ...rest] = path.split("/");
   if (section === "drivers" && id && !tab) {
@@ -117,6 +119,18 @@ function designedScreen(path: string, state: PreviewState): ReactNode {
   }
   return null;
 }
+const designedFinance = [
+  "earnings",
+  "payouts",
+  "payouts/destination",
+  "payouts/destination/change",
+  "payouts/destination/review",
+  "payouts/settlement",
+  "payouts/settlement/review",
+  "payouts/settlement/confirm",
+  "payouts/split",
+  "payouts/split/review",
+];
 const designedReports = ["reports", "reports/earnings", "reports/performance"];
 const designedSettings = [
   "settings/profile",
@@ -299,14 +313,13 @@ export function FleetPortal({ path }: { path: string }) {
   if (designed) screen = designed;
   else if (handlesWorkflow(path)) screen = <WorkflowScreen path={path} />;
   else if (path === "") screen = <Dashboard />;
-  else if (path === "drivers/invite") screen = <InviteDriver />;
   else if (path === "operations/trp-99321")
     screen = state.market === "NG" ? <TripDetail /> : <OperationsUnavailable trip />;
   else if (path === "operations")
     screen = state.market === "NG" ? <Operations /> : <OperationsUnavailable />;
   else if (path.startsWith("settings") || path === "notifications")
     screen = <Settings key={path} path={path} />;
-  else screen = <Directory key={path} kind={path} />;
+  else screen = null;
 
   return (
     <DemoContext.Provider value={setNotice}>
@@ -470,7 +483,6 @@ function Login() {
           <Link href="/" className="fp-back-home">
             <ArrowLeft size={16} /> Back to home
           </Link>
-          <PreviewToolbar />
           <h2>
             Welcome to
             <br />
@@ -556,6 +568,9 @@ function Login() {
               Explore the fleet portal <ChevronRight size={15} />
             </Link>
           </div>
+          {/* Preview controls sit below the sign-in form so the design's heading and form lead. */}
+          <h3 className="fp-login-settings">Preview settings</h3>
+          <PreviewToolbar />
         </div>
       </section>
     </main>

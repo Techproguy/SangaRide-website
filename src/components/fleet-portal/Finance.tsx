@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Download } from "lucide-react";
 import { people, portalUrl } from "@/lib/fleet-portal";
 import {
@@ -8,7 +8,6 @@ import {
   Badge,
   Button,
   DataTable,
-  DemoForm,
   Dropdown,
   ExportButton,
   Field,
@@ -38,9 +37,9 @@ import { PreviewBanner } from "./WorkflowUI";
 export function Finance({ path }: { path: string }) {
   if (path === "payouts") return <Payouts />;
   if (path === "payouts/destination") return <Destination />;
-  if (path === "payouts/destination/change") return <ChangeDestination />;
-  if (path === "payouts/split") return <Split />;
-  return <Settlement confirm={path.endsWith("confirm")} />;
+  if (path.startsWith("payouts/destination/")) return <ChangeDestination />;
+  if (path.startsWith("payouts/split")) return <Split />;
+  return <Settlement confirm={path !== "payouts/settlement"} />;
 }
 /** Illustrative per-driver payout amounts, in minor units of each market's currency. */
 const samplePayout = {
@@ -244,433 +243,704 @@ function Destination() {
     </>
   );
 }
+const today = () => new Date().toISOString().slice(0, 10);
+const stepUpNote = "Unavailable — live identity service required";
+
+/** Pending finance requests of one type for the selected market, linked to their records. */
+function RequestList({ type }: { type: string }) {
+  const { state } = usePreview();
+  const requests = state.records.requests.filter(
+    (r) => r.market === state.market && r.fields.type === type,
+  );
+  return (
+    <Panel title="Requests">
+      {requests.length ? (
+        <ul className="fp-request-list">
+          {requests.map((r) => (
+            <li key={r.id}>
+              <Link
+                className="fp-text-link"
+                href={portalUrl(`payouts/requests/${r.id}`)}
+              >
+                {r.id.toUpperCase()}
+              </Link>{" "}
+              <Badge>{r.status}</Badge>{" "}
+              <small className="fp-muted">
+                Effective {r.fields.effective ?? "—"}
+              </small>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="fp-muted">No requests in this market yet.</p>
+      )}
+    </Panel>
+  );
+}
+
+/** Shown after a request is created: it is pending review, never applied. */
+function RequestSubmitted({ id, what }: { id: string; what: string }) {
+  return (
+    <Panel title="Request submitted for review">
+      <p role="status" className="fp-success">
+        Reference {id.toUpperCase()}. Your current {what} is unchanged until the
+        request is approved and its effective date arrives.
+      </p>
+      <div className="fp-work-actions">
+        <Button href={`payouts/requests/${id}`}>View request</Button>
+        <Button secondary href="payouts">
+          Back to payouts
+        </Button>
+      </div>
+    </Panel>
+  );
+}
+
+/** Reason, future effective date and step-up acknowledgement shared by finance requests. */
+function RequestTerms({
+  effective,
+  setEffective,
+  reason,
+  setReason,
+  stepUp,
+  setStepUp,
+}: {
+  effective: string;
+  setEffective: (v: string) => void;
+  reason: string;
+  setReason: (v: string) => void;
+  stepUp: boolean;
+  setStepUp: (v: boolean) => void;
+}) {
+  return (
+    <>
+      <Field
+        label="Requested effective date (future)"
+        type="date"
+        required
+        value={effective}
+        onChange={setEffective}
+      />
+      <label className="fp-field">
+        Reason
+        <textarea
+          required
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </label>
+      <label className="fp-check">
+        <input
+          type="checkbox"
+          checked={stepUp}
+          onChange={(e) => setStepUp(e.target.checked)}
+        />
+        I understand a live step-up check and Sanga approval are required
+        before any real change
+      </label>
+    </>
+  );
+}
+
+const destinationBanks = {
+  NG: ["Wema Bank", "Access Bank", "GTBank", "First Bank"],
+  US: ["Sample US bank", "Sample credit union"],
+} as const;
+
+/** F04-06 on the FLT 37 layout. Creates a pending destination request; nothing is verified or moved. */
 function ChangeDestination() {
+  const { state, execute } = usePreview();
+  const banks = destinationBanks[state.market];
   const [step, setStep] = useState(0);
-  const [bank, setBank] = useState("Wema Bank");
-  const [number, setNumber] = useState("0123456789");
+  const [bank, setBank] = useState<string>(banks[0]);
+  const [number, setNumber] = useState("");
   const [name, setName] = useState("Lagos Move Fleet Ltd");
-  const [done, setDone] = useState(false);
+  const [accountType, setAccountType] = useState("Business Account");
+  const [effective, setEffective] = useState("");
+  const [reason, setReason] = useState("");
+  const [stepUp, setStepUp] = useState(false);
+  const [error, setError] = useState("");
+  const [created, setCreated] = useState("");
+  const masked = `•••• ${number.slice(-4)}`;
+  function next(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (step === 0) {
+      const valid =
+        state.market === "NG"
+          ? /^\d{10}$/.test(number)
+          : /^\d{4,17}$/.test(number);
+      if (!valid)
+        return setError(
+          state.market === "NG"
+            ? "Enter a 10-digit NUBAN account number."
+            : "Enter an account number of 4 to 17 digits.",
+        );
+      return setStep(1);
+    }
+    if (step === 1) {
+      if (!effective || effective <= today())
+        return setError("Choose a future effective date.");
+      if (!stepUp)
+        return setError("Acknowledge the step-up and approval requirement.");
+      return setStep(2);
+    }
+    // Only the masked account is kept; the full number never enters the preview store.
+    const result = execute({
+      kind: "create",
+      collection: "requests",
+      name: "destination request",
+      fields: {
+        type: "destination",
+        destination: `${bank} · ${masked}`,
+        accountType,
+        verification: "Pending verification",
+        effective,
+        reason,
+        currency: marketConfig[state.market].currency,
+        stepUp: stepUpNote,
+      },
+    });
+    if (!result.ok) return setError(result.error);
+    setCreated(result.id);
+  }
   return (
     <>
       <Header
         title="Change Payout Destination"
         description="Enter your bank account details to receive fleet earnings"
+        back={{ label: "Back to Payout Destination", path: "payouts/destination" }}
       />
-      <Steps
-        labels={["Bank Details", "Verification", "Review & Confirm"]}
-        current={step}
-      />
-      <form
-        className="fp-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (step < 2) setStep(step + 1);
-          else setDone(true);
-        }}
-      >
-        <div className="fp-two">
-          <Panel
-            title={
-              step === 0
-                ? "Bank Account Details"
-                : step === 1
-                  ? "Verification preview"
-                  : "Review & Confirm"
-            }
-          >
-            {step === 0 ? (
-              <>
-                <Field label="Bank name" required>
-                  <Dropdown
-                    label="Bank name"
-                    value={bank}
-                    onChange={setBank}
-                    options={[
-                      "Wema Bank",
-                      "Access Bank",
-                      "GTBank",
-                      "First Bank",
+      <PreviewBanner />
+      {created ? (
+        <RequestSubmitted id={created} what="payout destination" />
+      ) : (
+        <>
+          <Steps
+            labels={["Bank Details", "Verification", "Review & Confirm"]}
+            current={step}
+          />
+          <form className="fp-form" onSubmit={next}>
+            <div className="fp-two">
+              <Panel
+                title={
+                  ["Bank Account Details", "Verification", "Review & Confirm"][
+                    step
+                  ]
+                }
+              >
+                {step === 0 ? (
+                  <>
+                    <Field label="Bank name" required>
+                      <Dropdown
+                        label="Bank name"
+                        value={bank}
+                        onChange={setBank}
+                        options={[...banks]}
+                      />
+                    </Field>
+                    <Field
+                      label="Account number"
+                      required
+                      placeholder={
+                        state.market === "NG" ? "10-digit NUBAN" : "Account number"
+                      }
+                      value={number}
+                      onChange={(v) => setNumber(v.replace(/\D/g, ""))}
+                    />
+                    <Field
+                      label="Account name"
+                      required
+                      value={name}
+                      onChange={setName}
+                    />
+                    <Field label="Account type">
+                      <Dropdown
+                        label="Account type"
+                        value={accountType}
+                        onChange={setAccountType}
+                        options={["Business Account", "Corporate Account"]}
+                      />
+                    </Field>
+                  </>
+                ) : step === 1 ? (
+                  <>
+                    <KeyValues
+                      items={[
+                        ["Bank", bank],
+                        ["Account number", masked],
+                        ["Account name", name],
+                        ["Verification", <Badge key="v">Pending verification</Badge>],
+                      ]}
+                    />
+                    <Info>
+                      Bank verification is not connected. The request stays
+                      pending verification; the account name is not confirmed.
+                    </Info>
+                    <RequestTerms
+                      {...{ effective, setEffective, reason, setReason, stepUp, setStepUp }}
+                    />
+                  </>
+                ) : (
+                  <KeyValues
+                    items={[
+                      ["Bank", bank],
+                      ["Account number", masked],
+                      ["Account name", name],
+                      ["Account type", accountType],
+                      ["Currency", marketConfig[state.market].currency],
+                      ["Effective date", effective],
+                      ["Reason", reason],
+                      ["Step-up", stepUpNote],
                     ]}
                   />
-                </Field>
-                <Field
-                  label="Account number"
-                  required
-                  value={number}
-                  onChange={setNumber}
-                />
-                <Field
-                  label="Account name"
-                  required
-                  value={name}
-                  onChange={setName}
-                />
-                <Field label="Account type">
-                  <Dropdown
-                    label="Account type"
-                    options={["Business Account", "Corporate Account"]}
-                  />
-                </Field>
-              </>
-            ) : (
-              <>
-                <KeyValues
-                  items={[
-                    ["Bank", bank],
-                    ["Account number", number],
-                    ["Account name", name],
-                    ["Account type", "Business Account"],
-                  ]}
-                />
-                <Info>
-                  Bank verification is not connected. This is a review of sample
-                  details, not a verified account.
-                </Info>
-                {done && (
-                  <p role="status" className="fp-success">
-                    Preview complete. Your live payout destination has not
-                    changed.
-                  </p>
                 )}
-              </>
+              </Panel>
+              <div className="fp-stack">
+                <Panel title="Verification Process">
+                  <ol className="fp-timeline">
+                    {[
+                      ["Enter your bank account details", "Provide a business account in the fleet's registered name"],
+                      ["We verify with your bank", "Account name and ownership checks, once banking services are connected"],
+                      ["Review & confirm account details", "Sanga reviews and approves before the effective date"],
+                    ].map(([s, d], i) => (
+                      <li key={s} className={i <= step ? "active" : ""}>
+                        <span>{i + 1}</span>
+                        <div>
+                          <strong>{s}</strong>
+                          <p className="fp-muted">{d}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </Panel>
+                <Panel title="Important Information">
+                  <ul className="fp-plain-list">
+                    <li>The account must belong to your registered business.</li>
+                    <li>Payouts already in progress continue to the current destination.</li>
+                    <li>The change applies only after verification and approval, from the effective date.</li>
+                  </ul>
+                </Panel>
+              </div>
+            </div>
+            {error && (
+              <p role="alert" className="fp-error">
+                {error}
+              </p>
             )}
-          </Panel>
-          <Panel title="Verification Process">
-            <ol className="fp-timeline">
-              {[
-                "Enter your bank account details",
-                "We verify with your bank",
-                "Review & confirm account details",
-              ].map((s, i) => (
-                <li key={s} className={i <= step ? "active" : ""}>
-                  <span>{i + 1}</span>
-                  <div>
-                    <strong>{s}</strong>
-                    <p className="fp-muted">
-                      {i === 1
-                        ? "Available when live banking services are connected"
-                        : "Provide a valid business bank account"}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </Panel>
-        </div>
-        <Info>
-          Use sample details in this frontend preview. No bank verification or
-          account change is submitted.
-        </Info>
-        <div className="fp-form-actions">
-          {step > 0 ? (
-            <Button secondary onClick={() => setStep(step - 1)}>
-              Back
-            </Button>
-          ) : (
-            <Button secondary href="payouts/destination">
-              Cancel
-            </Button>
-          )}
-          <Button type="submit">
-            {step === 2 ? "Confirm preview" : "Continue"}
-          </Button>
-        </div>
-      </form>
+            <div className="fp-form-actions">
+              {step > 0 ? (
+                <Button secondary onClick={() => setStep(step - 1)}>
+                  Back
+                </Button>
+              ) : (
+                <Button secondary href="payouts/destination">
+                  Cancel
+                </Button>
+              )}
+              <Button type="submit">
+                {step === 2 ? "Submit request" : "Continue"}
+              </Button>
+            </div>
+          </form>
+        </>
+      )}
     </>
   );
 }
+
 const modes = [
   {
+    key: "Sanga-managed / platform",
     title: "Platform Settlement",
     detail: "(Recommended)",
     bullets: [
-      "Driver are paid directly by Sanga ride",
-      "Your fleet receives service fees/commission",
+      "Drivers are paid by Sanga or its payment partners",
+      "Your fleet receives its share after Sanga's commission",
       "Ideal for most fleets",
       "Lower operational overhead",
     ],
   },
   {
+    key: "Fleet-managed / direct",
     title: "Fleet Direct Settlement",
     detail: "",
     bullets: [
-      "Driver earnings are settled by your fleet",
-      "Full control over driver payouts",
-      "Required verified payout destination",
+      "Your fleet remits driver earnings under an approved agreement",
+      "Sanga's commission is still deducted first",
+      "Requires a verified payout destination",
       "Best for large fleets with internal systems",
     ],
   },
 ];
+// Sample snapshot: every sample trip was captured under platform settlement, version 1.
+const currentMode = modes[0];
+
+/** F04-07/F04-08 on the FLT 38/40 layouts. Mode changes are reviewed, future-dated requests. */
 function Settlement({ confirm }: { confirm: boolean }) {
-  const [mode, setMode] = useState(0);
+  const { state, execute } = usePreview();
   const [tab, setTab] = useState("Current Mode");
-  const notice = useNotice();
-  return (
-    <>
-      <Header
-        title={confirm ? "Confirm Settlement Mode Change" : "Settlement Mode"}
-        description={
-          confirm
-            ? "Review your selection and confirm to proceed"
-            : "Choose how driver earnings are settled for your fleet"
-        }
-      />
-      {confirm ? (
-        <Steps
-          labels={["Review Change", "Effective Date", "Confirmation"]}
-          current={2}
+  const [mode, setMode] = useState(modes[1].key);
+  const [effective, setEffective] = useState("");
+  const [reason, setReason] = useState("");
+  const [stepUp, setStepUp] = useState(false);
+  const [error, setError] = useState("");
+  const [created, setCreated] = useState("");
+  const requested = modes.find((m) => m.key === mode) ?? modes[1];
+  const activity = state.audit.filter(
+    (e) =>
+      e.market === state.market &&
+      e.fields.collection === "requests" &&
+      e.name.toLowerCase().includes("settlement"),
+  );
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (mode === currentMode.key)
+      return setError("Choose a mode different from the current one.");
+    if (!effective || effective <= today())
+      return setError("Choose a future effective date.");
+    if (!stepUp)
+      return setError("Acknowledge the step-up and approval requirement.");
+    const result = execute({
+      kind: "create",
+      collection: "requests",
+      name: "settlement request",
+      fields: {
+        type: "settlement",
+        mode,
+        effective,
+        reason,
+        currency: marketConfig[state.market].currency,
+        stepUp: stepUpNote,
+      },
+    });
+    if (!result.ok) return setError(result.error);
+    setCreated(result.id);
+  }
+  const modeCard = (m: (typeof modes)[number], badge: string) => (
+    <div key={m.key} className="fp-mode active">
+      <div>
+        <strong>{m.title}</strong>
+        <Badge>{badge}</Badge>
+      </div>
+      <p className="fp-muted">{m.detail}</p>
+      <ul>
+        {m.bullets.map((b) => (
+          <li key={b}>✓ {b}</li>
+        ))}
+      </ul>
+    </div>
+  );
+  if (confirm)
+    return (
+      <>
+        <Header
+          title="Confirm Settlement Mode Change"
+          description="Review your selection and submit it for review"
+          back={{ label: "Back to Settlement Mode", path: "payouts/settlement" }}
         />
-      ) : (
-        <Tabs
-          active={tab}
-          onChange={setTab}
-          items={["Current Mode", "Permission", "Activity Log"].map(
-            (label) => ({ label }),
-          )}
-        />
-      )}{" "}
-      {tab === "Permission" && !confirm ? (
-        <Panel title="Settlement permissions">
-          <Info>
-            Only authorized fleet owners can request a settlement mode change.
-            Preview controls do not grant real permissions.
-          </Info>
-          <label className="fp-check">
-            <input type="checkbox" defaultChecked />
-            Fleet owner approval required
-          </label>
-        </Panel>
-      ) : tab === "Activity Log" && !confirm ? (
-        <DataTable
-          headers={["Date", "User", "Action"]}
-          rows={[
-            {
-              key: "mode",
-              cells: [
-                "12 Sep 2026",
-                "Samuel Eze",
-                "Platform Settlement activated",
-              ],
-            },
-          ]}
-        />
-      ) : (
-        <>
-          {!confirm && (
-            <div className="fp-two">
-              <Panel
-                title="Current Settlement Mode"
-                action={<Badge>Verified</Badge>}
-              >
-                <h3>
-                  Platform Settlement{" "}
-                  <span className="fp-muted">(Recommended)</span>
-                </h3>
-                <p className="fp-muted">
-                  Driver earnings are automatically paid out by Sanga ride to
-                  drivers, and your fleet receives the service fees/commission
-                </p>
-                <Info>
-                  <ul>
-                    {[
-                      "Automatic driver payouts",
-                      "Reduced financial risk",
-                      "Transparent reporting",
-                      "Recommended for most fleets",
-                    ].map((s) => (
-                      <li key={s}>✓ {s}</li>
-                    ))}
-                  </ul>
-                </Info>
-              </Panel>
-              <Panel title="How it works" className="fp-soft-panel">
-                <ol className="fp-timeline">
-                  {[
-                    "Customer pays for trips via the platform",
-                    "Sanga Ride deducts service fees",
-                    "Driver earnings are paid out automatically",
-                    "Your fleet receives commission/fees",
-                  ].map((s, i) => (
-                    <li key={s} className="active">
-                      <span>{i + 1}</span>
-                      {s}
-                    </li>
-                  ))}
-                </ol>
-              </Panel>
-            </div>
-          )}
-          <Panel title="Available Settlement Modes">
-            <div className="fp-two fp-mode-options">
-              {modes.map((m, i) => (
-                <label
-                  key={m.title}
-                  className={`fp-mode ${mode === i ? "active" : ""}`}
-                >
-                  <div>
-                    <strong>{m.title}</strong>
-                    {confirm ? (
-                      <Badge>
-                        {i ? "Effective 1 Nov 2026" : "Current mode"}
-                      </Badge>
-                    ) : (
-                      <input
-                        type="radio"
-                        name="settlement-mode"
-                        checked={mode === i}
-                        onChange={() => setMode(i)}
-                      />
-                    )}
-                  </div>
-                  <p className="fp-muted">{m.detail}</p>
-                  <ul>
-                    {m.bullets.map((b) => (
-                      <li key={b}>✓ {b}</li>
-                    ))}
-                  </ul>
-                </label>
-              ))}
-            </div>
-          </Panel>
-          {confirm && (
+        <PreviewBanner />
+        {created ? (
+          <RequestSubmitted id={created} what="settlement mode" />
+        ) : (
+          <form className="fp-form" onSubmit={submit}>
+            <Steps
+              labels={["Review Change", "Effective Date", "Confirmation"]}
+              current={effective ? (stepUp ? 2 : 1) : 0}
+            />
+            <Panel title="Requested change">
+              <div className="fp-two fp-mode-options">
+                {modeCard(currentMode, "Current mode")}
+                {modeCard(
+                  requested,
+                  effective ? `Requested from ${effective}` : "Requested",
+                )}
+              </div>
+              <Field label="New settlement mode" required>
+                <Dropdown
+                  label="New settlement mode"
+                  value={mode}
+                  onChange={setMode}
+                  options={modes.map((m) => m.key)}
+                />
+              </Field>
+              <RequestTerms
+                {...{ effective, setEffective, reason, setReason, stepUp, setStepUp }}
+              />
+            </Panel>
             <Panel title="Change Summary">
               <KeyValues
                 items={[
-                  ["New Settlement Mode", "Fleet Direct Settlement"],
-                  ["Effective Date", "1 Nov 2026"],
+                  ["Current mode", currentMode.title],
+                  ["Requested mode", requested.title],
+                  ["Effective date", effective || "Not chosen"],
                   [
-                    "In-flight Trips",
-                    "Will be settled using current mode (Platform Settlement)",
+                    "In-flight trips",
+                    `Settled under the mode captured when they started (${currentMode.title}).`,
                   ],
                   [
-                    "Unsettled Earnings",
-                    "Will be processed using current mode. New earnings after the effective date will follow the new mode.",
+                    "Unsettled earnings",
+                    "Processed under the current mode. Earnings after the effective date follow the new mode.",
                   ],
+                  ["Sanga commission", "Deducted first in both modes."],
                 ]}
               />
             </Panel>
-          )}
+            {error && (
+              <p role="alert" className="fp-error">
+                {error}
+              </p>
+            )}
+            <div className="fp-form-actions">
+              <Button secondary href="payouts/settlement">
+                Cancel
+              </Button>
+              <Button type="submit">Submit request</Button>
+            </div>
+          </form>
+        )}
+      </>
+    );
+  return (
+    <>
+      <Header
+        title="Settlement Mode"
+        description="Choose how driver earnings are settled for your fleet"
+      />
+      <PreviewBanner />
+      <Tabs
+        active={tab}
+        onChange={setTab}
+        items={["Current Mode", "Permission", "Activity Log"].map((label) => ({
+          label,
+        }))}
+      />
+      {tab === "Permission" ? (
+        <Panel title="Settlement permissions">
+          <Info>
+            Only fleet owners can request a settlement mode change, and Sanga
+            must approve it. Preview roles do not grant real permissions.
+          </Info>
+          <KeyValues
+            items={[
+              ["Your preview role", state.role],
+              [
+                "Can request a change",
+                state.role === "Owner" ? "Yes (preview)" : "No",
+              ],
+            ]}
+          />
+        </Panel>
+      ) : tab === "Activity Log" ? (
+        activity.length ? (
+          <DataTable
+            headers={["Event", "Change", "Reason"]}
+            rows={activity.map((e) => ({
+              key: e.id,
+              cells: [e.id, <Badge key="s">{e.status}</Badge>, e.fields.reason ?? "—"],
+            }))}
+          />
+        ) : (
+          <Panel title="No activity yet">
+            <p className="fp-muted">
+              Settlement requests made in this preview appear here.
+            </p>
+          </Panel>
+        )
+      ) : (
+        <>
+          <div className="fp-two">
+            <Panel
+              title="Current Settlement Mode"
+              action={<Badge>Sample · version 1</Badge>}
+            >
+              <h3>
+                {currentMode.title}{" "}
+                <span className="fp-muted">{currentMode.detail}</span>
+              </h3>
+              <p className="fp-muted">
+                Sanga deducts its commission first. Driver earnings are paid by
+                Sanga or its payment partners, and your fleet receives its share
+                of the remaining net.
+              </p>
+              <Info>
+                <ul>
+                  {[
+                    "Automatic driver payouts",
+                    "Reduced financial risk",
+                    "Transparent reporting",
+                    "Recommended for most fleets",
+                  ].map((s) => (
+                    <li key={s}>✓ {s}</li>
+                  ))}
+                </ul>
+              </Info>
+            </Panel>
+            <Panel title="How it works" className="fp-soft-panel">
+              <ol className="fp-timeline">
+                {[
+                  "Rider pays for the trip",
+                  "Sanga deducts its commission first",
+                  "Driver share is paid out by Sanga or its partners",
+                  "Your fleet receives its share of the net",
+                ].map((s, i) => (
+                  <li key={s} className="active">
+                    <span>{i + 1}</span>
+                    {s}
+                  </li>
+                ))}
+              </ol>
+            </Panel>
+          </div>
+          <Panel title="Available Settlement Modes">
+            <div className="fp-two fp-mode-options">
+              {modes.map((m) =>
+                modeCard(m, m === currentMode ? "Current mode" : "Available on request"),
+              )}
+            </div>
+          </Panel>
+          <RequestList type="settlement" />
           <div className="fp-info fp-info-action">
             <p>
-              {confirm
-                ? "Review how in-flight trips and unsettled earnings will be handled. This frontend preview cannot change live settlement terms."
-                : "You can request to change your settlement mode. Changes are subject to review and may have effective date restrictions."}
+              You can request a settlement mode change. Requests are reviewed and
+              take effect only from a future date; existing trips keep their
+              original terms.
             </p>
-            {confirm ? (
-              <>
-                <Button secondary href="payouts/settlement">
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() =>
-                    notice(
-                      "Settlement change preview recorded. No live settlement setting or agreement was changed.",
-                    )
-                  }
-                >
-                  Confirm Change
-                </Button>
-              </>
-            ) : (
-              <Button href="payouts/settlement/confirm">Request Change</Button>
-            )}
+            <Button href="payouts/settlement/review">Request Change</Button>
           </div>
         </>
       )}
     </>
   );
 }
+
+/** F04-10/F04-11 on the FLT 42 layout. Split changes are future-dated requests, never immediate. */
 function Split() {
+  const { state, execute } = usePreview();
   const [share, setShare] = useState(20);
-  const [saved, setSaved] = useState(20);
-  const [when, setWhen] = useState("now");
+  const [effective, setEffective] = useState("");
+  const [reason, setReason] = useState("");
+  const [stepUp, setStepUp] = useState(false);
+  const [error, setError] = useState("");
+  const [created, setCreated] = useState("");
+  const drivers = state.records.drivers.filter(
+    (d) => d.market === state.market,
+  ).length;
+  const clamp = (v: string) => Math.min(100, Math.max(0, Number(v) || 0));
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (!effective || effective <= today())
+      return setError(
+        "Choose a future date. Existing trips keep their original split.",
+      );
+    if (!stepUp)
+      return setError("Acknowledge the step-up and approval requirement.");
+    const result = execute({
+      kind: "create",
+      collection: "requests",
+      name: "split request",
+      fields: {
+        type: "split",
+        fleet: String(share),
+        driver: String(100 - share),
+        effective,
+        reason,
+        currency: marketConfig[state.market].currency,
+        stepUp: stepUpNote,
+      },
+    });
+    if (!result.ok) return setError(result.error);
+    setCreated(result.id);
+  }
   return (
     <>
       <Header
         title="Default Split"
         description="Set the default earnings split for all drivers in your fleet"
       />
+      <PreviewBanner />
       <Info>
-        The split applies to all drivers without a custom override. You can set
-        per-driver splits if needed.
+        The split applies to the net after Sanga&apos;s commission, for drivers
+        without a custom override. Per-driver overrides are unavailable until
+        approved (D-08).
       </Info>
-      <Panel title="Current Default Split" action={<Badge>Active</Badge>}>
+      <Panel
+        title="Current Default Split"
+        action={<Badge>Sample · version 1</Badge>}
+      >
         <div className="fp-two">
           <Panel title="Fleet Share">
-            <p className="fp-big-number">{saved}%</p>
-            <p className="fp-muted">Goes to your fleet account</p>
+            <p className="fp-big-number">20%</p>
+            <p className="fp-muted">Of the post-Sanga net, to your fleet</p>
           </Panel>
           <Panel title="Driver Share">
-            <p className="fp-big-number">{100 - saved}%</p>
-            <p className="fp-muted">Goes to driver payout</p>
+            <p className="fp-big-number">80%</p>
+            <p className="fp-muted">Of the post-Sanga net, to the driver</p>
           </Panel>
         </div>
         <p className="fp-muted">
-          Applies to <strong>156 drivers</strong>
+          Applies to <strong>{drivers} sample drivers</strong> · Illustrative
+          only, no commercial split is approved
         </p>
       </Panel>
-      <Panel title="Update Default Split">
-        <DemoForm onSave={() => setSaved(share)} button="Confirm Change">
-          <div className="fp-two">
-            <Field
-              label="Fleet Share (%)"
-              type="number"
-              value={String(share)}
-              onChange={(v) => setShare(Math.min(100, Math.max(0, Number(v))))}
-            />
-            <Field
-              label="Driver Share (%)"
-              type="number"
-              value={String(100 - share)}
-              onChange={(v) =>
-                setShare(100 - Math.min(100, Math.max(0, Number(v))))
-              }
-            />
-          </div>
-          <input
-            className="fp-range"
-            aria-label="Fleet share percentage"
-            type="range"
-            min="0"
-            max="100"
-            value={share}
-            onChange={(e) => setShare(Number(e.target.value))}
-          />
-          <small>Total must equal 100%</small>
-          <Info>
-            This change will apply to all new earnings from the effective date.
-            It will not affect completed trips or existing earnings.
-          </Info>
-          <h3>Effective Date</h3>
-          <div className="fp-radio-row">
-            <label>
-              <input
-                type="radio"
-                name="effective"
-                checked={when === "now"}
-                onChange={() => setWhen("now")}
+      {created ? (
+        <RequestSubmitted id={created} what="default split" />
+      ) : (
+        <Panel title="Update Default Split">
+          <form className="fp-form" onSubmit={submit}>
+            <div className="fp-two">
+              <Field
+                label="Fleet Share (%)"
+                type="number"
+                value={String(share)}
+                onChange={(v) => setShare(clamp(v))}
               />
-              Apply immediately
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="effective"
-                checked={when === "later"}
-                onChange={() => setWhen("later")}
+              <Field
+                label="Driver Share (%)"
+                type="number"
+                value={String(100 - share)}
+                onChange={(v) => setShare(100 - clamp(v))}
               />
-              Schedule for later
-            </label>
-          </div>
-          {when === "later" && (
-            <Field label="Effective date" type="date" required />
-          )}
-        </DemoForm>
-      </Panel>
+            </div>
+            <input
+              className="fp-range"
+              aria-label="Fleet share percentage"
+              type="range"
+              min="0"
+              max="100"
+              value={share}
+              onChange={(e) => setShare(Number(e.target.value))}
+            />
+            <small>Total must equal 100% · currently {share + (100 - share)}%</small>
+            <Info>
+              This change applies to new earnings from the effective date. It
+              does not affect completed trips, trips in progress or existing
+              earnings.
+            </Info>
+            <RequestTerms
+              {...{ effective, setEffective, reason, setReason, stepUp, setStepUp }}
+            />
+            {error && (
+              <p role="alert" className="fp-error">
+                {error}
+              </p>
+            )}
+            <div className="fp-form-actions">
+              <Button secondary href="payouts">
+                Cancel
+              </Button>
+              <Button type="submit">Submit request</Button>
+            </div>
+          </form>
+        </Panel>
+      )}
+      <RequestList type="split" />
+      <AllocationBreakdown />
     </>
   );
 }
-
 export function Reports({ path }: { path: string }) {
   const [type, setType] = useState("Earning report");
   const [group, setGroup] = useState("Daily");

@@ -3001,6 +3001,39 @@
   color: #1550f0;
   font-weight: 600;
 }
+.fp-error {
+  padding: 12px 15px;
+  background: #fdecec;
+  color: #b42318;
+  border-radius: 8px;
+}
+.fp-request-list,
+.fp-plain-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fp-plain-list li {
+  padding-left: 16px;
+  position: relative;
+}
+.fp-plain-list li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #1c74fe;
+}
+.fp-login-settings {
+  margin: 28px 0 8px;
+  font-size: 0.85rem;
+  color: #667085;
+}
+/* The avatar sits on a blue circle; keep its initials white like the Figma design. */
+.fp-preview-toolbar a.fp-initials {
+  color: #fff;
+}
 .fp-work-actions {
   display: flex;
   flex-wrap: wrap;

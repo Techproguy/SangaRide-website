@@ -21,7 +21,7 @@ import {
   Tabs,
   statusLabel,
 } from "./ui";
-import { FleetMap, Trend, sampleGross } from "./Overview";
+import { FleetMap, Trend } from "./Overview";
 import {
   allocation,
   formatMoney,
@@ -141,7 +141,8 @@ export function VehicleDetail({
   const issues = state.records.issues.filter(
     (i) => i.fields.vehicle === record.id,
   );
-  const split = allocation(sampleGross[state.market] / 20, 1500, 2000);
+  // Illustrative 40 completed trips for this vehicle in the last 30 days.
+  const split = allocation(perTrip[state.market] * 40, 1500, 2000);
   const documents = [
     "Vehicle Registration",
     "Insurance Certificate",
@@ -237,7 +238,7 @@ export function VehicleDetail({
           </div>
           <Stats
             items={[
-              { label: "Total Trips (Last 30 Days)", value: "150" },
+              { label: "Total Trips (Last 30 Days)", value: "40" },
               {
                 label: "Total Earning (Last 30 Days)",
                 value: money(split.gross),
